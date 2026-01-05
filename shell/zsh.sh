@@ -14,6 +14,11 @@ if [[ -f "$DOTFILES_PATH/modules/aliases.sh" ]]; then
 	source "$DOTFILES_PATH/modules/aliases.sh"
 fi
 
+# Source local modules (not tracked by git)
+if [[ -f "$DOTFILES_PATH/modules/local.sh" ]]; then
+	source "$DOTFILES_PATH/modules/local.sh"
+fi
+
 # Editor preference (uncomment and set your preferred editor)
 export EDITOR=vim
 

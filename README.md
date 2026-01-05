@@ -38,6 +38,10 @@ dotfiles/
 ├── modules/                # Modular configurations
 │   ├── aliases.sh           # Unix aliases and functions
 │   ├── aliases.ps1         # PowerShell aliases and functions
+│   ├── local.sh             # Unix local config (not tracked)
+│   ├── local.ps1           # PowerShell local config (not tracked)
+│   ├── local.example.sh     # Unix local config template (tracked)
+│   ├── local.example.ps1   # PowerShell local config template (tracked)
 │   ├── paths.sh             # Unix PATH management
 │   ├── paths.ps1           # PowerShell PATH management
 │   ├── tools.sh            # Unix tool installation
@@ -146,6 +150,66 @@ Edit `modules/paths.ps1`:
 Add-Path "$env:USERPROFILE\my-tools\bin"
 ```
 
+## Adding Local Configuration
+
+For machine-specific configuration that shouldn't be tracked in git (work-related paths, company-specific aliases, local tools, etc.), use the local module files.
+
+Example templates are provided in `modules/local.example.sh` and `modules/local.example.ps1` to help you get started.
+
+### macOS
+
+Copy the example and customize it:
+
+```bash
+cp modules/local.example.sh modules/local.sh
+vim modules/local.sh
+```
+
+Edit `modules/local.sh`:
+
+```bash
+# Add your alias
+alias myworkalias='your command here'
+
+# Or add a function
+myworkfunction() {
+    echo "Machine-specific setup"
+}
+
+# Or set environment variables
+export WORKSPACE="$HOME/workspace"
+```
+
+The file will be automatically sourced if it exists.
+
+### Windows
+
+Copy the example and customize it:
+
+```powershell
+Copy-Item modules\local.example.ps1 modules\local.ps1
+notepad modules\local.ps1
+```
+
+Edit `modules/local.ps1`:
+
+```powershell
+# Add your function
+function MyWorkFunction {
+    Write-Host "Machine-specific setup"
+}
+
+# Or set environment variables
+$env:WORKSPACE = "$env:USERPROFILE\workspace"
+```
+
+The file will be automatically sourced if it exists.
+
+**Note**: 
+- `modules/local.sh` and `modules/local.ps1` are listed in `.gitignore` and will not be committed
+- `modules/local.example.sh` and `modules/local.example.ps1` ARE committed and serve as templates
+- Copy the example files to create your local configuration
+
 ## Updating Tools
 
 If you want to reinstall or update tools (like `gum`):
@@ -226,7 +290,3 @@ Remove-Item -Recurse -Force $HOME\dotfiles
 
 Fonts are not covered in the scripts.
 Preference is to use [Nerd Fonts](https://www.nerdfonts.com/) to cover icons and they look nice as well.
-
-```
-function dev { Set-Location "C:\Users\kevin\Documents\dev" }
-```

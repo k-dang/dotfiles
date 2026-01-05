@@ -13,6 +13,12 @@ if (Test-Path "$env:DOTFILES_PATH\modules\aliases.ps1")
     . "$env:DOTFILES_PATH\modules\aliases.ps1"
 }
 
+# Source local modules (not tracked by git)
+if (Test-Path "$env:DOTFILES_PATH\modules\local.ps1")
+{
+    . "$env:DOTFILES_PATH\modules\local.ps1"
+}
+
 # Editor preference (uncomment and set your preferred editor)
 $env:EDITOR = "edit"
 
