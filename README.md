@@ -6,22 +6,26 @@ Cross-platform dotfiles setup for development environments with common aliases.
 
 ### macOS
 
+One-liner install
 ```bash
-# One-liner install
 curl -fsSL https://raw.githubusercontent.com/k-dang/dotfiles/main/install.sh | bash
+```
 
-# Or clone and run manually
+Or clone and run manually
+```bash
 git clone https://github.com/k-dang/dotfiles.git ~/dotfiles
 ~/dotfiles/install.sh
 ```
 
 ### Windows (PowerShell 5.x)
 
+One-liner install
 ```powershell
-# One-liner install
 iwr -useb https://raw.githubusercontent.com/k-dang/dotfiles/main/install.ps1 | iex
+```
 
-# Or clone and run manually
+Or clone and run manually
+```
 git clone https://github.com/k-dang/dotfiles.git $HOME\dotfiles
 $HOME\dotfiles\install.ps1
 ```
