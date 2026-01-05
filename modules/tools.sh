@@ -7,28 +7,12 @@ install_gum() {
 
 	echo "Installing gum..."
 
-	if [[ "$OSTYPE" == "darwin"* ]]; then
-		# macOS with Homebrew
-		if command -v brew &>/dev/null; then
-			brew install gum
-		else
-			echo "⚠️  Homebrew not found. Cannot install gum automatically."
-			echo "   Install manually: brew install gum"
-			return 1
-		fi
+	if command -v brew &>/dev/null; then
+		brew install gum
 	else
-		# Linux - try common package managers
-		if command -v apt &>/dev/null; then
-			sudo apt install -y gum
-		elif command -v dnf &>/dev/null; then
-			sudo dnf install -y gum
-		elif command -v pacman &>/dev/null; then
-			sudo pacman -S gum
-		else
-			echo "⚠️  No supported package manager found."
-			echo "   Install gum manually from: https://github.com/charmbracelet/gum"
-			return 1
-		fi
+		echo "⚠️  Homebrew not found. Cannot install gum automatically."
+		echo "   Install manually: brew install gum"
+		return 1
 	fi
 }
 
@@ -43,8 +27,6 @@ install_fzf() {
 
 	if command -v brew &>/dev/null; then
 		brew install fzf
-		# Set up fzf key bindings and fuzzy completion
-		$(brew --prefix)/opt/fzf/install --all
 	else
 		echo "⚠️  Homebrew not found. Cannot install fzf automatically."
 		echo "   Install manually: brew install fzf"
@@ -80,8 +62,7 @@ install_ohmyposh() {
 	echo "Installing oh-my-posh..."
 
 	if command -v brew &>/dev/null; then
-		brew tap jandedobbeleer/oh-my-posh
-		brew install oh-my-posh
+	    brew install jandedobbeleer/oh-my-posh/oh-my-posh
 	else
 		echo "⚠️  Homebrew not found. Cannot install oh-my-posh automatically."
 		echo "   Install manually: brew install oh-my-posh"
@@ -100,15 +81,9 @@ install_zoxide() {
 
 	if command -v brew &>/dev/null; then
 		brew install zoxide
-	elif command -v apt &>/dev/null; then
-		sudo apt install -y zoxide
-	elif command -v dnf &>/dev/null; then
-		sudo dnf install -y zoxide
-	elif command -v pacman &>/dev/null; then
-		sudo pacman -S zoxide
 	else
-		echo "⚠️  No supported package manager found."
-		echo "   Install zoxide manually: https://github.com/ajeetdsouza/zoxide"
+		echo "⚠️  Homebrew not found. Cannot install zoxide automatically."
+		echo "   Install manually: brew install zoxide"
 		return 1
 	fi
 }

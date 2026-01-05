@@ -17,6 +17,11 @@ fi
 # Editor preference (uncomment and set your preferred editor)
 export EDITOR=vim
 
+# Set up fzf key bindings and fuzzy completion
+if command -v fzf &>/dev/null; then
+	source <(fzf --zsh)
+fi
+
 # Initialize oh-my-posh theme
 if command -v oh-my-posh &>/dev/null; then
 	eval "$(oh-my-posh init zsh --config "$DOTFILES_PATH/config/oh-my-posh/config.omp.json")"
