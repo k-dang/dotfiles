@@ -61,7 +61,7 @@
         },
         {
           "type": "node",
-          "style": "powerline",
+          "style": "plain",
           "foreground": "#6CA35E",
           "template": " {{ .Full }} "
         },

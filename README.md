@@ -26,26 +26,6 @@ git clone https://github.com/k-dang/dotfiles.git $HOME\dotfiles
 $HOME\dotfiles\install.ps1
 ```
 
-## Testing Changes Locally
-
-Before pushing changes to git, you can test them locally using the `--local` flag:
-
-### macOS
-
-```bash
-cd ~/dotfiles
-./install.sh --local
-```
-
-### Windows (PowerShell 5.x)
-
-```powershell
-cd $HOME\dotfiles
-.\install.ps1 -Local
-```
-
-The `--local` flag skips the git clone step and uses your current directory instead, allowing you to test changes without committing them first.
-
 ## Project Structure
 
 ```

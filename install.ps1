@@ -1,10 +1,6 @@
 # Dotfiles Bootstrap Script for Windows PowerShell
 # One-liner install: iwr -useb https://raw.githubusercontent.com/k-dang/dotfiles/main/install.ps1 | iex
 
-param(
-    [switch]$Local
-)
-
 $DOTFILES_PATH = "$HOME\dotfiles"
 
 # Remove existing dotfiles if present
@@ -18,18 +14,9 @@ if (Test-Path $DOTFILES_PATH) {
     }
 }
 
-if ($Local) {
-    # Copy from local directory
-    $sourcePath = $PSScriptRoot
-    Write-Host "Copying dotfiles from local directory: $sourcePath..." -ForegroundColor Cyan
-    Get-ChildItem -Path $sourcePath -Force | Where-Object { $_.Name -ne '.git' } | ForEach-Object {
-        Copy-Item -Path $_.FullName -Destination $DOTFILES_PATH -Recurse -Force
-    }
-} else {
-    # Clone dotfiles
-    Write-Host "Cloning dotfiles to $DOTFILES_PATH..." -ForegroundColor Cyan
-    git clone https://github.com/k-dang/dotfiles.git $DOTFILES_PATH
-}
+# Clone dotfiles
+Write-Host "Cloning dotfiles to $DOTFILES_PATH..." -ForegroundColor Cyan
+git clone https://github.com/k-dang/dotfiles.git $DOTFILES_PATH
 
 # Check execution policy
 $executionPolicy = Get-ExecutionPolicy -Scope CurrentUser

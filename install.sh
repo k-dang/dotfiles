@@ -5,12 +5,6 @@
 
 set -e
 
-# Parse arguments
-USE_LOCAL=false
-if [[ "$1" == "--local" ]]; then
-	USE_LOCAL=true
-fi
-
 DOTFILES_PATH="$HOME/dotfiles"
 
 # Remove existing dotfiles if present
@@ -19,16 +13,9 @@ if [ -d "$DOTFILES_PATH" ]; then
 	rm -rf "$DOTFILES_PATH"
 fi
 
-if [ "$USE_LOCAL" = true ]; then
-	# Copy from local directory
-	SOURCE_PATH="$(cd "$(dirname "$0")" && pwd)"
-	echo "Copying dotfiles from local directory: $SOURCE_PATH..."
-	cp -r "$SOURCE_PATH" "$DOTFILES_PATH"
-else
-	# Clone dotfiles
-	echo "Cloning dotfiles to $DOTFILES_PATH..."
-	git clone https://github.com/k-dang/dotfiles.git "$DOTFILES_PATH"
-fi
+# Clone dotfiles
+echo "Cloning dotfiles to $DOTFILES_PATH..."
+git clone https://github.com/k-dang/dotfiles.git "$DOTFILES_PATH"
 
 # Run tools installation (once, during install)
 if [ -f "$DOTFILES_PATH/modules/tools.sh" ]; then
