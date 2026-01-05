@@ -60,6 +60,12 @@
           "style": "plain"
         },
         {
+          "type": "node",
+          "style": "powerline",
+          "foreground": "#6CA35E",
+          "template": " {{ .Full }} "
+        },
+        {
           "template": "\uf105",
           "foreground": "p:closer",
           "type": "text",
