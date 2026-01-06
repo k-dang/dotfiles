@@ -25,7 +25,7 @@
           "style": "plain"
         },
         {
-          "template": "{{ .UserName }}@{{ .HostName }} ",
+          "template": "{{ .UserName }} ",
           "foreground": "p:blue",
           "type": "session",
           "style": "plain"
