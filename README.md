@@ -46,8 +46,6 @@ dotfiles/
 │   ├── local.ps1           # PowerShell local config (not tracked)
 │   ├── local.example.sh     # Unix local config template (tracked)
 │   ├── local.example.ps1   # PowerShell local config template (tracked)
-│   ├── paths.sh             # Unix PATH management
-│   ├── paths.ps1           # PowerShell PATH management
 │   ├── tools.sh            # Unix tool installation
 │   └── tools.ps1           # PowerShell tool installation
 ├── bin/                    # Utility scripts
@@ -132,26 +130,6 @@ Reload your shell:
 
 ```powershell
 . $PROFILE
-```
-
-## Adding New Paths
-
-### macOS
-
-Edit `modules/paths.sh`:
-
-```bash
-# Add your path
-add_path "$HOME/my-tools/bin"
-```
-
-### Windows
-
-Edit `modules/paths.ps1`:
-
-```powershell
-# Add your path
-Add-Path "$env:USERPROFILE\my-tools\bin"
 ```
 
 ## Adding Local Configuration

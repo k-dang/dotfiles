@@ -6,10 +6,6 @@ set -e
 export DOTFILES_PATH="$HOME/dotfiles"
 
 # Source modules
-if [[ -f "$DOTFILES_PATH/modules/paths.sh" ]]; then
-	source "$DOTFILES_PATH/modules/paths.sh"
-fi
-
 if [[ -f "$DOTFILES_PATH/modules/aliases.sh" ]]; then
 	source "$DOTFILES_PATH/modules/aliases.sh"
 fi
@@ -23,9 +19,9 @@ fi
 export EDITOR=vim
 
 # Set up fzf key bindings and fuzzy completion
-if command -v fzf &>/dev/null; then
-	source <(fzf --zsh)
-fi
+# if command -v fzf &>/dev/null; then
+# 	source <(fzf --zsh)
+# fi
 
 # Initialize oh-my-posh theme
 if command -v oh-my-posh &>/dev/null; then

@@ -3,11 +3,6 @@
 $env:DOTFILES_PATH = "$HOME\dotfiles"
 
 # Source modules
-if (Test-Path "$env:DOTFILES_PATH\modules\paths.ps1")
-{
-    . "$env:DOTFILES_PATH\modules\paths.ps1"
-}
-
 if (Test-Path "$env:DOTFILES_PATH\modules\aliases.ps1")
 {
     . "$env:DOTFILES_PATH\modules\aliases.ps1"
