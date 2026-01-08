@@ -1,8 +1,6 @@
 #!/bin/bash
 
 # Dotfiles main zsh configuration
-set -e
-
 export DOTFILES_PATH="$HOME/dotfiles"
 
 # Source modules
