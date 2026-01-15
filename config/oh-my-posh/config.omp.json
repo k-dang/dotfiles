@@ -66,6 +66,12 @@
           "template": " {{ .Full }} "
         },
         {
+          "type": "ruby",
+          "style": "plain",
+          "foreground": "#E0115F",
+          "template": " {{ .Full }} "
+        },
+        {
           "template": "\uf105",
           "foreground": "p:closer",
           "type": "text",
