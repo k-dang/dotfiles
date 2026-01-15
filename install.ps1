@@ -59,16 +59,19 @@ if (Test-Path $PROFILE) {
     Copy-Item $PROFILE $BACKUP_FILE -Force
 }
 
-# Create new profile
-Write-Host "Creating PowerShell profile..." -ForegroundColor Cyan
-@"
-# Dotfiles
-. "$HOME\dotfiles\shell\powershell.ps1"
-"@ | Out-File -FilePath $PROFILE -Encoding UTF8
-
-
+# Ensure profile sources dotfiles
+Write-Host "Ensuring PowerShell profile sources dotfiles..." -ForegroundColor Cyan
+$dotfilesLine = ". `"$HOME\dotfiles\shell\powershell.ps1`""
+$profileContent = if (Test-Path $PROFILE) { Get-Content $PROFILE -Raw -ErrorAction SilentlyContinue } else { "" }
+if ($profileContent -match [regex]::Escape($dotfilesLine)) {
+    Write-Host "Profile already sources dotfiles" -ForegroundColor Green
+} else {
+    Add-Content -Path $PROFILE -Value "# Dotfiles"
+    Add-Content -Path $PROFILE -Value $dotfilesLine
+}
 
 Write-Host ""
+
 Write-Host "[PASS] Dotfiles setup complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan

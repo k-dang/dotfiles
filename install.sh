@@ -2,9 +2,6 @@
 
 # Dotfiles Bootstrap Script for MacOs
 # One-liner install: curl -fsSL https://raw.githubusercontent.com/k-dang/dotfiles/main/install.sh | bash
-
-set -e
-
 DOTFILES_PATH="$HOME/dotfiles"
 
 # Remove existing dotfiles if present
@@ -30,12 +27,17 @@ if [ -f "$HOME/.zshrc" ]; then
 	cp "$HOME/.zshrc" "$BACKUP_FILE"
 fi
 
-# Create new .zshrc
-echo "Creating .zshrc..."
-cat >"$HOME/.zshrc" <<'EOF'
-# Dotfiles
-source "$HOME/dotfiles/shell/zsh.sh"
-EOF
+# Ensure .zshrc sources dotfiles
+DOTFILES_LINE='source "$HOME/dotfiles/shell/zsh.sh"'
+if [[ -f "$HOME/.zshrc" ]] && grep -q "${DOTFILES_LINE}" "$HOME/.zshrc"; then
+	echo ".zshrc already sources dotfiles"
+else
+	echo "Appending dotfiles to .zshrc..."
+	{
+		echo "# Dotfiles"
+		echo "${DOTFILES_LINE}"
+	} >>"$HOME/.zshrc"
+fi
 
 # Make bin scripts executable
 echo "Making bin scripts executable..."
