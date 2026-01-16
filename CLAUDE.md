@@ -32,16 +32,6 @@ Cross-platform dotfiles repository supporting macOS (zsh) and Windows (PowerShel
   - Manages: `~/.config/git/*` files
   - Without stow: manually copy files from `home/.config/` to `~/.config/`
 
-## Verification
-
-```bash
-# macOS
-~/dotfiles/bin/verify-setup.sh
-
-# Windows
-$HOME\dotfiles\bin\verify-setup.ps1
-```
-
 ## Architecture
 
 Shell config entry points (`shell/zsh.sh` and `shell/powershell.ps1`) source modules then initialize tools (oh-my-posh, zoxide, mise).
