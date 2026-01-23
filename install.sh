@@ -33,7 +33,7 @@ if command -v stow &>/dev/null; then
 
 	# Run stow from dotfiles directory
 	cd "$DOTFILES_PATH"
-	if stow --target="$HOME" home 2>/dev/null; then
+	if stow --target="$HOME" --no-folding home 2>/dev/null; then
 		echo "✓ Successfully stowed ~/.config"
 	else
 		echo "⚠️  Warning: stow command failed. You may need to manually manage ~/.config"
