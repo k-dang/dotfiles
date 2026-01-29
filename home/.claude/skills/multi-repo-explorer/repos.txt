@@ -1,0 +1,10 @@
+# Reference repositories - one URL per line
+# Lines starting with # are ignored
+# Examples:
+# git@github.com:your-org/auth-service.git
+# git@github.com:your-org/shared-utils.git
+# https://github.com/public/some-library.git
+
+git@github.com:wealthsimple/risk-service.git
+git@github.com:wealthsimple/eks-app-workloads.git
+git@github.com:wealthsimple/ws-decision-platform.git
