@@ -63,13 +63,25 @@
           "type": "node",
           "style": "plain",
           "foreground": "#6CA35E",
-          "template": " {{ .Full }} "
+          "template": "{{ if not (glob \"bun.lock\") }} {{ .Full }} {{ end }}"
         },
         {
           "type": "ruby",
           "style": "plain",
           "foreground": "#E0115F",
           "template": " {{ .Full }} "
+        },
+        {
+          "type": "bun",
+          "style": "plain",
+          "foreground": "#3C82F6",
+          "template": " {{ .Full }} "
+        },
+        {
+          "type": "python",
+          "style": "plain",
+          "foreground": "#ffd43b",
+          "template": " {{ .Full }} "
         },
         {
           "template": "\uf105",
@@ -80,6 +92,6 @@
       ]
     }
   ],
-  "version": 3,
+  "version": 4,
   "final_space": true
 }
