@@ -17,6 +17,12 @@ git clone https://github.com/k-dang/dotfiles.git ~/dotfiles
 ~/dotfiles/install.sh
 ```
 
+Or use the CLI
+```bash
+git clone https://github.com/k-dang/dotfiles.git ~/dotfiles
+~/dotfiles/dot init
+```
+
 ### Windows (PowerShell 5.x)
 
 One-liner install
@@ -34,6 +40,7 @@ $HOME\dotfiles\install.ps1
 
 ```
 dotfiles/
+├── dot                      # CLI for dotfiles management
 ├── install.sh              # Unix one-liner bootstrap
 ├── install.ps1              # Windows one-liner bootstrap
 ├── shell/                  # Main shell configurations
@@ -64,6 +71,34 @@ dotfiles/
 - **Cross-platform**: Same structure works on macOS, Linux, and Windows
 - **Auto-backup**: Existing configs are backed up before overwriting
 - **Tool installation**: Auto-installs tools like `gum`, `fzf`, `lazygit`, `zoxide`, `oh-my-posh` during setup
+
+## Dot CLI
+
+The `dot` command is a full CLI alternative to `install.sh` with subcommands and flags.
+
+### Commands
+
+```bash
+dot init                 # Full setup (tools, stow, shell config)
+dot update               # Pull latest changes and restow configs
+dot doctor               # Check dependencies and configuration
+dot stow                 # Recreate symlinks for ~/.config
+dot link                 # Install dot into PATH (symlink)
+dot unlink               # Remove the symlink
+dot help                 # Show help
+```
+
+### Options
+
+```bash
+--dotfiles-dir PATH      # Override dotfiles directory
+--no-clone               # Do not attempt to clone repo
+--skip-tools             # Skip modules/tools.sh
+--skip-stow              # Skip stow of ~/.config
+--skip-shell             # Skip .zshrc changes
+--version                # Show version
+-h, --help               # Show help
+```
 
 ## Verification
 
