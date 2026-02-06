@@ -1,6 +1,6 @@
 ---
 description: Create a Graphite stack PR with guided commit message
-allowed-tools: Bash(gt:*), Bash(git status:*), Bash(git diff:*), Bash(echo:*), Bash(fold:*), Bash(wc:*)
+allowed-tools: Bash(gt:*), Bash(git status:*), Bash(git diff:*), Bash(echo:*), Bash(fold:*), Bash(wc:*), Bash(gh:*)
 argument-hint: [motivation/context]
 ---
 
@@ -83,10 +83,35 @@ EOF
 Submit the PR as a draft:
 
 ```bash
-gt stack submit --no-interactive --draft
+gt submit --stack --no-interactive --draft
 ```
 
-### Step 7: Output Slack Review Message
+### Step 7: Update PR Description
+
+Generate a PR description and apply it with `gh pr edit`.
+
+**Template discovery** — Check these locations in order for a PR template:
+1. `.github/PULL_REQUEST_TEMPLATE.md`
+2. `.github/PULL_REQUEST_TEMPLATE/` directory (use default template if multiple exist)
+3. `PULL_REQUEST_TEMPLATE.md`
+4. `docs/PULL_REQUEST_TEMPLATE.md`
+
+**If a template is found:** Use it as the scaffold. Fill in each section using the diff analysis, user-provided context, and commit message. Remove irrelevant sections rather than leaving empty placeholders.
+
+**If no template is found:** Generate a default description with:
+- **Summary** — Brief explanation of the change and motivation
+- **Changes** — Bullet list of what was changed
+- **Test plan** — How to verify the change works
+
+**Apply the description:**
+```bash
+gh pr edit --body "$(cat <<'EOF'
+<generated description here>
+EOF
+)"
+```
+
+### Step 8: Output Slack Review Message
 
 Output both Slack-friendly message formats in a fenced markdown block for easy copy-paste:
 
