@@ -16,6 +16,24 @@ install_gum() {
 	fi
 }
 
+# Install bat if not present
+install_bat() {
+	if command -v bat &>/dev/null; then
+		echo "bat is already installed"
+		return 0
+	fi
+
+	echo "Installing bat..."
+
+	if command -v brew &>/dev/null; then
+		brew install bat
+	else
+		echo "⚠️  Homebrew not found. Cannot install bat automatically."
+		echo "   Install manually: brew install bat"
+		return 1
+	fi
+}
+
 # Install fzf if not present
 install_fzf() {
 	if command -v fzf &>/dev/null; then
@@ -62,7 +80,7 @@ install_ohmyposh() {
 	echo "Installing oh-my-posh..."
 
 	if command -v brew &>/dev/null; then
-	    brew install jandedobbeleer/oh-my-posh/oh-my-posh
+		brew install jandedobbeleer/oh-my-posh/oh-my-posh
 	else
 		echo "⚠️  Homebrew not found. Cannot install oh-my-posh automatically."
 		echo "   Install manually: brew install oh-my-posh"
@@ -107,6 +125,7 @@ install_mise() {
 
 # Auto-install tools
 install_gum
+install_bat
 install_fzf
 install_lazygit
 install_ohmyposh

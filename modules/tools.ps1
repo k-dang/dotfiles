@@ -26,6 +26,28 @@ function Install-Gum
     }
 }
 
+# Install bat if not present
+function Install-Bat
+{
+    if (Get-Command bat -ErrorAction SilentlyContinue)
+    {
+        Write-Host "bat is already installed" -ForegroundColor Green
+        return
+    }
+
+    Write-Host "Installing bat..." -ForegroundColor Cyan
+
+    if (Get-Command winget -ErrorAction SilentlyContinue)
+    {
+        winget install sharkdp.bat --accept-source-agreements --accept-package-agreements
+    } else
+    {
+        Write-Warning "winget not found. Cannot install bat automatically."
+        Write-Warning "Install bat manually: https://github.com/sharkdp/bat"
+        return
+    }
+}
+
 # Install fzf if not present
 function Install-Fzf
 {
@@ -168,6 +190,7 @@ function Install-Mise
 
 # Auto-install tools
 Install-Gum
+Install-Bat
 Install-Fzf
 Install-Lazygit
 Install-OhMyPosh

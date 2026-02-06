@@ -70,7 +70,7 @@ dotfiles/
 - **Modular structure**: Easy to add new aliases, paths, and tools
 - **Cross-platform**: Same structure works on macOS, Linux, and Windows
 - **Auto-backup**: Existing configs are backed up before overwriting
-- **Tool installation**: Auto-installs tools like `gum`, `fzf`, `lazygit`, `zoxide`, `oh-my-posh` during setup
+- **Tool installation**: Auto-installs tools like `gum`, `bat`, `fzf`, `lazygit`, `zoxide`, `oh-my-posh` during setup
 
 ## Dot CLI
 
