@@ -307,3 +307,14 @@ Remove-Item -Recurse -Force $HOME\dotfiles
 
 Fonts are not covered in the scripts.
 Preference is to use [Nerd Fonts](https://www.nerdfonts.com/) to cover icons and they look nice as well.
+
+## GNU stow
+
+Check with dry run
+```bash
+stow -nv --no-folding --adopt -t ~ home
+```
+
+```bash
+stow --no-folding --adopt -t ~ home
+```

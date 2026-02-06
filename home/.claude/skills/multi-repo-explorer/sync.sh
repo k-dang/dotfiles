@@ -3,7 +3,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOS_FILE="$SCRIPT_DIR/repos.txt"
-REPOS_DIR="${REPOS_DIR:-$HOME/dev/reference-repos}"
+REPOS_DIR="${REPOS_DIR:-$HOME/.reference-repos}"
 
 mkdir -p "$REPOS_DIR"
 

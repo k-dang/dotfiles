@@ -1,3 +1,6 @@
+# Misc aliases
+alias cc='claude'
+
 # Git aliases
 alias gst='git status'
 
@@ -37,4 +40,3 @@ gd() {
     fi
   fi
 }
-

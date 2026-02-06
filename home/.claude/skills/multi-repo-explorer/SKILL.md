@@ -19,7 +19,7 @@ git@github.com:your-org/shared-utils.git
 https://github.com/public/some-library.git
 ```
 
-**Default repos location:** `~/dev/reference-repos`
+**Default repos location:** `~/.reference-repos`
 **Override with:** `REPOS_DIR=/custom/path ./sync.sh`
 
 ## Usage
@@ -45,16 +45,16 @@ Use standard tools to explore the repos:
 
 ```bash
 # Search across all repos
-Grep pattern ~/dev/reference-repos
+Grep pattern ~/.reference-repos
 
 # Search specific repo
-Grep pattern ~/dev/reference-repos/auth-service
+Grep pattern ~/.reference-repos/auth-service
 
 # Find files
-Glob "**/*.ts" ~/dev/reference-repos/repo-name
+Glob "**/*.ts" ~/.reference-repos/repo-name
 
 # Read files
-Read ~/dev/reference-repos/repo-name/src/file.ts
+Read ~/.reference-repos/repo-name/src/file.ts
 ```
 
 ### Rules

@@ -8,3 +8,5 @@
 git@github.com:wealthsimple/risk-service.git
 git@github.com:wealthsimple/eks-app-workloads.git
 git@github.com:wealthsimple/ws-decision-platform.git
+git@github.com:wealthsimple/wealthsimple.git
+git@github.com:wealthsimple/fort-knox.git
