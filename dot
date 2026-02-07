@@ -18,14 +18,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Defaults (can be overridden by flags)
 DOTFILES_DIR="$SCRIPT_DIR"
-DOTFILES_REPO_URL="https://github.com/k-dang/dotfiles.git"
 SKIP_TOOLS=false
 SKIP_STOW=false
 SKIP_SHELL=false
-NO_CLONE=false
 
 # Paths
-PACKAGES_DIR=""
 HOME_DIR=""
 
 print_header() {
@@ -84,41 +81,7 @@ die() {
 }
 
 init_paths() {
-    PACKAGES_DIR="${DOTFILES_DIR}/packages"
     HOME_DIR="${DOTFILES_DIR}/home"
-}
-
-ensure_dotfiles_dir() {
-    if [[ "$NO_CLONE" == true ]]; then
-        if [[ ! -d "$DOTFILES_DIR" ]]; then
-            die "Dotfiles directory not found: ${DOTFILES_DIR}"
-        fi
-        return 0
-    fi
-
-    if [[ -d "${DOTFILES_DIR}/.git" ]]; then
-        return 0
-    fi
-
-    if [[ "$DOTFILES_DIR" == "$SCRIPT_DIR" ]]; then
-        die "Script is not inside a git repo. Use --dotfiles-dir to clone into a target path or pass --no-clone."
-    fi
-
-    print_header "Cloning dotfiles"
-    if [[ -d "$DOTFILES_DIR" ]]; then
-        die "Target directory exists but is not a git repo: ${DOTFILES_DIR}"
-    fi
-
-    if ! command_exists git; then
-        die "git is required to clone the dotfiles repository"
-    fi
-
-    print_info "Cloning ${DOTFILES_REPO_URL} to ${DOTFILES_DIR}..."
-    if git clone "$DOTFILES_REPO_URL" "$DOTFILES_DIR"; then
-        print_success "Dotfiles cloned"
-    else
-        die "Failed to clone dotfiles"
-    fi
 }
 
 install_tools() {
@@ -220,7 +183,6 @@ chmod_bin_scripts() {
 
 cmd_init() {
     print_header "Initializing dotfiles"
-    ensure_dotfiles_dir
     init_paths
     install_tools
     stow_dotfiles
@@ -232,7 +194,6 @@ cmd_init() {
 
 cmd_update() {
     print_header "Updating dotfiles"
-    ensure_dotfiles_dir
     init_paths
 
     if [[ -d "${DOTFILES_DIR}/.git" ]]; then
@@ -296,7 +257,6 @@ cmd_doctor() {
 }
 
 cmd_stow() {
-    ensure_dotfiles_dir
     init_paths
     stow_dotfiles
 }
@@ -365,7 +325,6 @@ cmd_help() {
 
     printf "${BOLD}OPTIONS:${RESET}\n"
     printf "    --dotfiles-dir PATH  Override dotfiles directory (default: script location)\n"
-    printf "    --no-clone           Do not attempt to clone the repository\n"
     printf "    --skip-tools         Skip tools installation (modules/tools.sh)\n"
     printf "    --skip-stow          Skip stowing ~/.config files\n"
     printf "    --skip-shell         Skip .zshrc configuration\n"
@@ -387,10 +346,6 @@ main() {
             --dotfiles-dir)
                 DOTFILES_DIR="$2"
                 shift 2
-                ;;
-            --no-clone)
-                NO_CLONE=true
-                shift
                 ;;
             --skip-tools)
                 SKIP_TOOLS=true

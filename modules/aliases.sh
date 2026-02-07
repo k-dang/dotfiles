@@ -1,9 +1,6 @@
 # Misc aliases
 alias cc='claude'
 
-# Git aliases
-alias gst='git status'
-
 # create a new worktree + branch, then step into it
 ga() {
   if [[ -z "$1" ]]; then

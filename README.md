@@ -92,7 +92,6 @@ dot help                 # Show help
 
 ```bash
 --dotfiles-dir PATH      # Override dotfiles directory
---no-clone               # Do not attempt to clone repo
 --skip-tools             # Skip modules/tools.sh
 --skip-stow              # Skip stow of ~/.config
 --skip-shell             # Skip .zshrc changes

@@ -1,8 +1,12 @@
-# Git aliases
-function gs { git status }
+# Misc aliases
+function cc
+{ 
+    claude 
+}
 
 # create a new worktree + branch, then step into it
-function ga {
+function ga
+{
     param(
         [Parameter(Mandatory)]
         [string]$Branch
@@ -16,17 +20,22 @@ function ga {
 }
 
 # remove current worktree and its branch
-function gd {
-    if (-not (Get-Command gum -ErrorAction SilentlyContinue)) {
+function gd
+{
+    if (-not (Get-Command gum -ErrorAction SilentlyContinue))
+    {
         Write-Warning "gum is not installed. Run: winget install charmbracelet.gum"
         $response = Read-Host "Remove worktree and branch? (y/n)"
-        if ($response -ne "y") { 
+        if ($response -ne "y")
+        { 
             Write-Host "Action cancelled." -ForegroundColor Gray
             return 
         }
-    } else {
+    } else
+    {
         gum confirm "Remove worktree and branch?"
-        if ($LASTEXITCODE -ne 0) { 
+        if ($LASTEXITCODE -ne 0)
+        { 
             Write-Host "Action cancelled." -ForegroundColor Gray
             return 
         }
@@ -35,7 +44,8 @@ function gd {
     $currentPath = $PWD.Path
     $worktree    = Split-Path -Leaf $currentPath
 
-    if ($worktree -notlike "*--*") {
+    if ($worktree -notlike "*--*")
+    {
         Write-Error "Abort: Folder '$worktree' doesn't follow 'root--branch' convention."
         return
     }
@@ -47,7 +57,8 @@ function gd {
     $parentPath = Split-Path -Parent $currentPath
     $rootPath   = Join-Path $parentPath $root
 
-    if (Test-Path $rootPath) {
+    if (Test-Path $rootPath)
+    {
         Write-Host "Moving to $rootPath..." -ForegroundColor Cyan
         Set-Location $rootPath
         Start-Sleep -Milliseconds 100
@@ -55,7 +66,8 @@ function gd {
         git worktree remove $worktree --force
         Write-Host "Deleting branch $branch..." -ForegroundColor Red
         git branch -D $branch
-    } else {
+    } else
+    {
         Write-Error "Could not find root repository at $rootPath"
     }
 }
