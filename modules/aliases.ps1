@@ -63,9 +63,47 @@ function gd
         Set-Location $rootPath
         Start-Sleep -Milliseconds 100
         Write-Host "Removing worktree $worktree..." -ForegroundColor Yellow
-        git worktree remove $worktree --force
+        git worktree remove --force -- $currentPath
+
+        $worktreeRemoved = $false
+        if ($LASTEXITCODE -eq 0)
+        {
+            $worktreeRemoved = $true
+        } elseif (Test-Path $currentPath)
+        {
+            Write-Warning "git worktree remove failed. Attempting filesystem cleanup for: $currentPath"
+            try
+            {
+                Remove-Item -LiteralPath $currentPath -Recurse -Force -ErrorAction Stop
+            } catch
+            {
+                Write-Error "Failed to remove worktree directory '$currentPath'. $_"
+                return
+            }
+
+            if (Test-Path $currentPath)
+            {
+                Write-Error "Worktree directory still exists after cleanup: $currentPath"
+                return
+            }
+
+            Write-Host "Worktree directory removed with PowerShell fallback." -ForegroundColor Yellow
+            $worktreeRemoved = $true
+        }
+
+        if (-not $worktreeRemoved)
+        {
+            Write-Error "Failed to remove worktree '$currentPath'."
+            return
+        }
+
         Write-Host "Deleting branch $branch..." -ForegroundColor Red
-        git branch -D $branch
+        git branch -D -- $branch
+        if ($LASTEXITCODE -ne 0)
+        {
+            Write-Error "Worktree removed, but failed to delete branch '$branch'."
+            return
+        }
     } else
     {
         Write-Error "Could not find root repository at $rootPath"
