@@ -123,6 +123,24 @@ install_mise() {
 	fi
 }
 
+# Install eza if not present
+install_eza() {
+	if command -v eza &>/dev/null; then
+		echo "eza is already installed"
+		return 0
+	fi
+
+	echo "Installing eza..."
+
+	if command -v brew &>/dev/null; then
+		brew install eza
+	else
+		echo "⚠️  Homebrew not found. Cannot install eza automatically."
+		echo "   Install manually: brew install eza"
+		return 1
+	fi
+}
+
 # Auto-install tools
 install_gum
 install_bat
@@ -131,3 +149,4 @@ install_lazygit
 install_ohmyposh
 install_zoxide
 install_mise
+install_eza

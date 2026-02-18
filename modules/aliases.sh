@@ -1,6 +1,14 @@
 # Misc aliases
 alias cc='claude'
 
+# eza (ls replacement)
+if command -v eza &>/dev/null; then
+  alias ls='eza'
+  alias ll='eza -l'
+  alias la='eza -la'
+  alias lt='eza --tree'
+fi
+
 # create a new worktree + branch, then step into it
 ga() {
   if [[ -z "$1" ]]; then
