@@ -128,7 +128,7 @@ stow_dotfiles() {
         cp -r "$HOME/.config" "$backup_config"
     fi
 
-    if stow --target="$HOME" --no-folding -d "$DOTFILES_DIR" home; then
+    if stow --adopt --target="$HOME" --no-folding -d "$DOTFILES_DIR" home; then
         print_success "Successfully stowed ~/.config"
     else
         print_warning "Stow command failed. You may need to manually manage ~/.config"
