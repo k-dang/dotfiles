@@ -76,6 +76,18 @@ dotfiles/
 
 The `dot` command is a full CLI alternative to `install.sh` with subcommands and flags.
 
+### Recommended workflow
+
+Use the CLI in two phases:
+
+1. Bootstrap the machine with `dot init`
+2. Use `dot update` to pull changes and re-stow managed files
+3. Use `dot stow` when you changed files under `home/` and want to restow them without pulling or reinstalling tools
+
+`dot init` is the first-run command. It installs tools, backs up an existing `~/.config` once if needed, adopts existing config files into the stow package, configures your shell, and makes scripts in `bin/` executable.
+
+`dot stow` and `dot update` are safe repeat commands. They use `stow --restow` so rerunning them reconciles managed symlinks without creating a fresh `~/.config` backup each time.
+
 ### Commands
 
 ```bash
@@ -98,6 +110,37 @@ dot help                 # Show help
 --version                # Show version
 -h, --help               # Show help
 ```
+
+### Typical usage
+
+#### First-time setup
+
+```bash
+git clone https://github.com/k-dang/dotfiles.git ~/dotfiles
+~/dotfiles/dot init
+source ~/.zshrc
+```
+
+#### Daily use after pulling changes
+
+```bash
+~/dotfiles/dot update
+```
+
+#### Restow after editing managed config files
+
+```bash
+~/dotfiles/dot stow
+```
+
+#### Optional: install `dot` on your PATH
+
+```bash
+~/dotfiles/dot link
+dot doctor
+```
+
+Once linked, you can use `dot init`, `dot update`, and `dot stow` directly.
 
 ## Verification
 
@@ -309,11 +352,28 @@ Preference is to use [Nerd Fonts](https://www.nerdfonts.com/) to cover icons and
 
 ## GNU stow
 
-Check with dry run
+The CLI already wraps the recommended stow behavior:
+
+- `dot init` performs first-time adoption
+- `dot stow` and `dot update` perform repeatable restows
+
+If you want to run GNU Stow manually, use these patterns.
+
+First-time adoption:
 ```bash
 stow -nv --no-folding --adopt -t ~ home
 ```
 
 ```bash
 stow --no-folding --adopt -t ~ home
+```
+
+Repeatable restow:
+
+```bash
+stow -nv --no-folding --restow -t ~ home
+```
+
+```bash
+stow --no-folding --restow -t ~ home
 ```

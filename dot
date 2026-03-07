@@ -102,6 +102,8 @@ install_tools() {
 }
 
 stow_dotfiles() {
+    local mode="${1:-routine}"
+
     if [[ "$SKIP_STOW" == true ]]; then
         print_info "Skipping stow"
         return 0
@@ -121,14 +123,22 @@ stow_dotfiles() {
 
     print_header "Stowing configuration files"
 
-    if [[ -d "$HOME/.config" && ! -L "$HOME/.config" ]]; then
+    if [[ "$mode" == "init" && -d "$HOME/.config" && ! -L "$HOME/.config" ]]; then
         local backup_config
         backup_config="$HOME/.config.backup.$(date +%Y%m%d_%H%M%S)"
         print_info "Backing up existing ~/.config to ${backup_config}"
         cp -r "$HOME/.config" "$backup_config"
     fi
 
-    if stow --adopt --target="$HOME" --no-folding -d "$DOTFILES_DIR" home; then
+    local stow_args=(--target="$HOME" --no-folding -d "$DOTFILES_DIR")
+
+    if [[ "$mode" == "init" ]]; then
+        stow_args+=(--adopt)
+    else
+        stow_args+=(--restow)
+    fi
+
+    if stow "${stow_args[@]}" home; then
         print_success "Successfully stowed ~/.config"
     else
         print_warning "Stow command failed. You may need to manually manage ~/.config"
@@ -185,7 +195,7 @@ cmd_init() {
     print_header "Initializing dotfiles"
     init_paths
     install_tools
-    stow_dotfiles
+    stow_dotfiles init
     setup_shell
     chmod_bin_scripts
     print_header "Initialization complete!"
@@ -210,7 +220,7 @@ cmd_update() {
         print_warning "No git repository found at ${DOTFILES_DIR}"
     fi
 
-    stow_dotfiles
+    stow_dotfiles routine
     print_success "Update complete"
 }
 
@@ -258,7 +268,7 @@ cmd_doctor() {
 
 cmd_stow() {
     init_paths
-    stow_dotfiles
+    stow_dotfiles routine
 }
 
 cmd_link() {
