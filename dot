@@ -123,6 +123,9 @@ stow_dotfiles() {
 
     print_header "Stowing configuration files"
 
+    # Stow only manages paths present under home/. Init backs up a real ~/.config
+    # first, then uses `--adopt` for matching files. Routine runs use `--restow`
+    # to refresh those symlinks. Unrelated files in ~/.config are left alone.
     if [[ "$mode" == "init" && -d "$HOME/.config" && ! -L "$HOME/.config" ]]; then
         local backup_config
         backup_config="$HOME/.config.backup.$(date +%Y%m%d_%H%M%S)"
@@ -202,28 +205,6 @@ cmd_init() {
     print_info "Restart your terminal or run: source ~/.zshrc"
 }
 
-cmd_update() {
-    print_header "Updating dotfiles"
-    init_paths
-
-    if [[ -d "${DOTFILES_DIR}/.git" ]]; then
-        if ! command_exists git; then
-            die "git is required to update the repository"
-        fi
-        print_info "Pulling latest changes..."
-        if git -C "$DOTFILES_DIR" pull --ff-only; then
-            print_success "Repository updated"
-        else
-            die "Failed to update repository"
-        fi
-    else
-        print_warning "No git repository found at ${DOTFILES_DIR}"
-    fi
-
-    stow_dotfiles routine
-    print_success "Update complete"
-}
-
 cmd_doctor() {
     print_header "Running diagnostics"
     local issues=0
@@ -271,52 +252,6 @@ cmd_stow() {
     stow_dotfiles routine
 }
 
-cmd_link() {
-    print_header "Creating symlink for dot command"
-
-    local target_dir="/usr/local/bin"
-    local link_path="${target_dir}/dot"
-
-    if [[ ! -w "$target_dir" ]]; then
-        target_dir="${HOME}/.local/bin"
-        link_path="${target_dir}/dot"
-        mkdir -p "$target_dir"
-        print_info "Using ${target_dir}"
-    fi
-
-    if [[ -L "$link_path" ]]; then
-        rm "$link_path"
-    fi
-
-    if ln -s "${DOTFILES_DIR}/dot" "$link_path"; then
-        print_success "Created symlink at ${link_path}"
-        print_info "Make sure ${target_dir} is in your PATH"
-    else
-        die "Failed to create symlink"
-    fi
-}
-
-cmd_unlink() {
-    print_header "Removing dot symlink"
-    local paths=(
-        "/usr/local/bin/dot"
-        "${HOME}/.local/bin/dot"
-    )
-
-    local found=false
-    for link_path in "${paths[@]}"; do
-        if [[ -L "$link_path" ]]; then
-            rm "$link_path"
-            print_success "Removed symlink at ${link_path}"
-            found=true
-        fi
-    done
-
-    if [[ "$found" == false ]]; then
-        print_warning "No dot symlink found"
-    fi
-}
-
 cmd_help() {
     printf "${BOLD}%s${RESET} - Dotfiles management tool\n" "$SCRIPT_NAME"
     printf "Version: %s\n\n" "$VERSION"
@@ -326,11 +261,8 @@ cmd_help() {
 
     printf "${BOLD}COMMANDS:${RESET}\n"
     printf "    init                Initialize and install dotfiles\n"
-    printf "    update              Update dotfiles and re-stow configs\n"
     printf "    doctor              Run diagnostics and check installation\n"
     printf "    stow                Create symlinks for dotfiles using GNU Stow\n"
-    printf "    link                Install dot command globally (create symlink in PATH)\n"
-    printf "    unlink              Uninstall global dot command (remove symlink)\n"
     printf "    help                Show this help message (default)\n\n"
 
     printf "${BOLD}OPTIONS:${RESET}\n"
@@ -344,9 +276,7 @@ cmd_help() {
     printf "${BOLD}EXAMPLES:${RESET}\n"
     printf "    %s init\n" "$SCRIPT_NAME"
     printf "    %s init --skip-tools\n" "$SCRIPT_NAME"
-    printf "    %s update --skip-stow\n" "$SCRIPT_NAME"
     printf "    %s stow\n" "$SCRIPT_NAME"
-    printf "    %s link\n" "$SCRIPT_NAME"
     printf "\n"
 }
 
@@ -390,20 +320,11 @@ main() {
         init)
             cmd_init "$@"
             ;;
-        update)
-            cmd_update "$@"
-            ;;
         doctor)
             cmd_doctor "$@"
             ;;
         stow)
             cmd_stow "$@"
-            ;;
-        link)
-            cmd_link "$@"
-            ;;
-        unlink)
-            cmd_unlink "$@"
             ;;
         help)
             cmd_help
