@@ -81,22 +81,19 @@ The `dot` command is a full CLI alternative to `install.sh` with subcommands and
 Use the CLI in two phases:
 
 1. Bootstrap the machine with `dot init`
-2. Use `dot update` to pull changes and re-stow managed files
-3. Use `dot stow` when you changed files under `home/` and want to restow them without pulling or reinstalling tools
+2. Use `dot doctor` to verify dependencies and shell wiring
+3. Use `dot stow` when you changed files under `home/` and want to restow them
 
 `dot init` is the first-run command. It installs tools, backs up an existing `~/.config` once if needed, adopts existing config files into the stow package, configures your shell, and makes scripts in `bin/` executable.
 
-`dot stow` and `dot update` are safe repeat commands. They use `stow --restow` so rerunning them reconciles managed symlinks without creating a fresh `~/.config` backup each time.
+`dot stow` is the safe repeat command. It uses `stow --restow` so rerunning it reconciles managed symlinks without creating a fresh `~/.config` backup each time.
 
 ### Commands
 
 ```bash
 dot init                 # Full setup (tools, stow, shell config)
-dot update               # Pull latest changes and restow configs
 dot doctor               # Check dependencies and configuration
 dot stow                 # Recreate symlinks for ~/.config
-dot link                 # Install dot into PATH (symlink)
-dot unlink               # Remove the symlink
 dot help                 # Show help
 ```
 
@@ -121,10 +118,10 @@ git clone https://github.com/k-dang/dotfiles.git ~/dotfiles
 source ~/.zshrc
 ```
 
-#### Daily use after pulling changes
+#### Verify your setup
 
 ```bash
-~/dotfiles/dot update
+~/dotfiles/dot doctor
 ```
 
 #### Restow after editing managed config files
@@ -133,14 +130,7 @@ source ~/.zshrc
 ~/dotfiles/dot stow
 ```
 
-#### Optional: install `dot` on your PATH
-
-```bash
-~/dotfiles/dot link
-dot doctor
-```
-
-Once linked, you can use `dot init`, `dot update`, and `dot stow` directly.
+You can run `~/dotfiles/dot help` at any time to see the current command list.
 
 ## Verification
 
@@ -355,7 +345,7 @@ Preference is to use [Nerd Fonts](https://www.nerdfonts.com/) to cover icons and
 The CLI already wraps the recommended stow behavior:
 
 - `dot init` performs first-time adoption
-- `dot stow` and `dot update` perform repeatable restows
+- `dot stow` performs repeatable restows
 
 If you want to run GNU Stow manually, use these patterns.
 
