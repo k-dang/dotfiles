@@ -101,9 +101,6 @@ dot help                 # Show help
 
 ```bash
 --dotfiles-dir PATH      # Override dotfiles directory
---skip-tools             # Skip modules/tools.sh
---skip-stow              # Skip stow of ~/.config
---skip-shell             # Skip .zshrc changes
 --version                # Show version
 -h, --help               # Show help
 ```

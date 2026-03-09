@@ -18,12 +18,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Defaults (can be overridden by flags)
 DOTFILES_DIR="$SCRIPT_DIR"
-SKIP_TOOLS=false
-SKIP_STOW=false
-SKIP_SHELL=false
-
-# Paths
-HOME_DIR=""
 
 print_header() {
     printf "\n${BOLD}${BLUE}==>${RESET} ${BOLD}%s${RESET}\n" "$1"
@@ -49,47 +43,12 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-confirm() {
-    local prompt="${1:-Continue?}"
-    local default="${2:-n}"
-
-    if [[ "$default" == "y" ]]; then
-        prompt="$prompt [Y/n]: "
-    else
-        prompt="$prompt [y/N]: "
-    fi
-
-    read -r -p "$prompt" response
-
-    case "$response" in
-        [yY][eE][sS]|[yY]) return 0 ;;
-        [nN][oO]|[nN]) return 1 ;;
-        "")
-            if [[ "$default" == "y" ]]; then
-                return 0
-            else
-                return 1
-            fi
-            ;;
-        *) return 1 ;;
-    esac
-}
-
 die() {
     print_error "$1"
     exit 1
 }
 
-init_paths() {
-    HOME_DIR="${DOTFILES_DIR}/home"
-}
-
 install_tools() {
-    if [[ "$SKIP_TOOLS" == true ]]; then
-        print_info "Skipping tools installation"
-        return 0
-    fi
-
     local tools_script="${DOTFILES_DIR}/modules/tools.sh"
     if [[ -f "$tools_script" ]]; then
         print_header "Installing tools"
@@ -103,11 +62,7 @@ install_tools() {
 
 stow_dotfiles() {
     local mode="${1:-routine}"
-
-    if [[ "$SKIP_STOW" == true ]]; then
-        print_info "Skipping stow"
-        return 0
-    fi
+    local home_dir="${DOTFILES_DIR}/home"
 
     if ! command_exists stow; then
         print_warning "GNU stow not found. Skipping ~/.config symlink management."
@@ -116,8 +71,8 @@ stow_dotfiles() {
         return 0
     fi
 
-    if [[ ! -d "$HOME_DIR" ]]; then
-        print_warning "No home directory to stow at ${HOME_DIR}"
+    if [[ ! -d "$home_dir" ]]; then
+        print_warning "No home directory to stow at ${home_dir}"
         return 0
     fi
 
@@ -149,11 +104,6 @@ stow_dotfiles() {
 }
 
 setup_shell() {
-    if [[ "$SKIP_SHELL" == true ]]; then
-        print_info "Skipping shell setup"
-        return 0
-    fi
-
     local zshrc="$HOME/.zshrc"
     local dotfiles_line='source "$HOME/dotfiles/shell/zsh.sh"'
 
@@ -196,7 +146,6 @@ chmod_bin_scripts() {
 
 cmd_init() {
     print_header "Initializing dotfiles"
-    init_paths
     install_tools
     stow_dotfiles init
     setup_shell
@@ -248,7 +197,6 @@ cmd_doctor() {
 }
 
 cmd_stow() {
-    init_paths
     stow_dotfiles routine
 }
 
@@ -267,15 +215,11 @@ cmd_help() {
 
     printf "${BOLD}OPTIONS:${RESET}\n"
     printf "    --dotfiles-dir PATH  Override dotfiles directory (default: script location)\n"
-    printf "    --skip-tools         Skip tools installation (modules/tools.sh)\n"
-    printf "    --skip-stow          Skip stowing ~/.config files\n"
-    printf "    --skip-shell         Skip .zshrc configuration\n"
     printf "    --version            Show version information\n"
     printf "    -h, --help           Show this help message\n\n"
 
     printf "${BOLD}EXAMPLES:${RESET}\n"
     printf "    %s init\n" "$SCRIPT_NAME"
-    printf "    %s init --skip-tools\n" "$SCRIPT_NAME"
     printf "    %s stow\n" "$SCRIPT_NAME"
     printf "\n"
 }
@@ -286,18 +230,6 @@ main() {
             --dotfiles-dir)
                 DOTFILES_DIR="$2"
                 shift 2
-                ;;
-            --skip-tools)
-                SKIP_TOOLS=true
-                shift
-                ;;
-            --skip-stow)
-                SKIP_STOW=true
-                shift
-                ;;
-            --skip-shell)
-                SKIP_SHELL=true
-                shift
                 ;;
             --version)
                 printf "%s version %s\n" "$SCRIPT_NAME" "$VERSION"
