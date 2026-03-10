@@ -90,6 +90,12 @@ acli jira workitem search --jql "project = TEAM" --json
 
 ## Creating Work Items
 
+**IMPORTANT:** The `--description` flag produces plain text with no line breaks.
+For formatted descriptions with paragraphs, use `--from-json` with Atlassian
+Document Format (ADF).
+
+### Simple creation (no formatting needed)
+
 ```bash
 # Basic creation
 acli jira workitem create \
@@ -97,12 +103,12 @@ acli jira workitem create \
   --type "Task" \
   --summary "Implement feature X"
 
-# With description
+# With plain text description (renders as single block, no line breaks)
 acli jira workitem create \
   --project "TEAM" \
-  --type "Story" \
-  --summary "User authentication flow" \
-  --description "As a user, I want to log in securely"
+  --type "Task" \
+  --summary "Fix login error" \
+  --description "This is a plain text description with no formatting"
 
 # With assignee
 acli jira workitem create \
@@ -117,14 +123,65 @@ acli jira workitem create \
   --type "Task" \
   --summary "Refactor auth module" \
   --label "tech-debt,refactor"
+```
 
-# As subtask (with parent)
+### With epic/parent linking
+
+There is NO `--epic` flag. Use `--parent` to link to an epic or parent issue:
+
+```bash
+# Link to epic via --parent
 acli jira workitem create \
   --project "TEAM" \
-  --type "Sub-task" \
-  --summary "Write unit tests" \
-  --parent "TEAM-123"
+  --type "Task" \
+  --summary "Implement feature X" \
+  --parent "TEAM-100"
+```
 
+Or use `parentIssueId` in JSON (see below).
+
+### With formatted description (recommended for multi-paragraph)
+
+Use `--from-json` with ADF for descriptions that need paragraphs, bullet lists,
+headings, or any formatting. The `description` field MUST be in ADF format when
+using JSON — plain text strings will be rejected.
+
+```bash
+cat > /tmp/ticket.json << 'EOF'
+{
+  "projectKey": "TEAM",
+  "type": "Task",
+  "summary": "Implement feature X",
+  "parentIssueId": "TEAM-100",
+  "description": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "First paragraph." }]
+      },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "Second paragraph renders with proper spacing." }]
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Bullet point one" }] }] },
+          { "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Bullet point two" }] }] }
+        ]
+      }
+    ]
+  }
+}
+EOF
+acli jira workitem create --from-json /tmp/ticket.json
+```
+
+### Other creation options
+
+```bash
 # Open editor for description
 acli jira workitem create \
   --project "TEAM" \
@@ -132,10 +189,7 @@ acli jira workitem create \
   --summary "Complex feature" \
   --editor
 
-# From JSON file
-acli jira workitem create --from-json "workitem.json"
-
-# Generate JSON template
+# Generate JSON template (useful to see all available fields)
 acli jira workitem create --generate-json
 ```
 
@@ -155,7 +209,7 @@ Common types (varies by project configuration):
 # Edit summary
 acli jira workitem edit --key "TEAM-123" --summary "Updated title"
 
-# Edit description
+# Edit description (plain text only, no line breaks)
 acli jira workitem edit --key "TEAM-123" --description "New description"
 
 # Change type
@@ -167,12 +221,41 @@ acli jira workitem edit --key "TEAM-123" --labels "urgent,production"
 # Remove labels
 acli jira workitem edit --key "TEAM-123" --remove-labels "draft"
 
-# Bulk edit with JQL
-acli jira workitem edit --jql "project = TEAM AND labels = old-label" \
-  --labels "new-label" --yes
-
 # Remove assignee
 acli jira workitem edit --key "TEAM-123" --remove-assignee
+
+# Bulk edit with JQL (--yes required to skip prompt)
+acli jira workitem edit --jql "project = TEAM AND labels = old-label" \
+  --labels "new-label" --yes
+```
+
+### Editing with formatted description (ADF via JSON)
+
+**IMPORTANT:** `--key` and `--from-json` CANNOT be combined. When using
+`--from-json` for edits, specify the target ticket(s) in the `issues` array
+inside the JSON file. Also requires `--yes` to confirm.
+
+```bash
+cat > /tmp/edit.json << 'EOF'
+{
+  "issues": ["TEAM-123"],
+  "description": {
+    "type": "doc",
+    "version": 1,
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "First paragraph." }]
+      },
+      {
+        "type": "paragraph",
+        "content": [{ "type": "text", "text": "Second paragraph with proper line breaks." }]
+      }
+    ]
+  }
+}
+EOF
+acli jira workitem edit --from-json /tmp/edit.json --yes
 ```
 
 ## Transitioning Work Items (Status Changes)
