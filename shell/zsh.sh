@@ -14,7 +14,7 @@ if [[ -f "$DOTFILES_PATH/modules/local.sh" ]]; then
 fi
 
 # Editor preference (uncomment and set your preferred editor)
-export EDITOR=vim
+export EDITOR=zed
 
 # Set up fzf key bindings and fuzzy completion
 # if command -v fzf &>/dev/null; then
