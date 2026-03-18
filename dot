@@ -78,28 +78,22 @@ stow_dotfiles() {
 
     print_header "Stowing configuration files"
 
-    # Stow only manages paths present under home/. Init backs up a real ~/.config
-    # first, then uses `--adopt` for matching files. Routine runs use `--restow`
-    # to refresh those symlinks. Unrelated files in ~/.config are left alone.
-    if [[ "$mode" == "init" && -d "$HOME/.config" && ! -L "$HOME/.config" ]]; then
-        local backup_config
-        backup_config="$HOME/.config.backup.$(date +%Y%m%d_%H%M%S)"
-        print_info "Backing up existing ~/.config to ${backup_config}"
-        cp -r "$HOME/.config" "$backup_config"
-    fi
+    # Stow only manages paths present under home/. Init performs a non-destructive
+    # initial stow and fails on conflicts with existing real files. Routine runs
+    # use `--restow` to refresh symlinks already managed by stow. Unrelated files
+    # in ~/.config are left alone.
 
     local stow_args=(--target="$HOME" --no-folding -d "$DOTFILES_DIR")
 
-    if [[ "$mode" == "init" ]]; then
-        stow_args+=(--adopt)
-    else
+    if [[ "$mode" != "init" ]]; then
         stow_args+=(--restow)
     fi
 
     if stow "${stow_args[@]}" home; then
         print_success "Successfully stowed ~/.config"
     else
-        print_warning "Stow command failed. You may need to manually manage ~/.config"
+        print_warning "Stow command failed, likely due to an existing conflicting file in ~/.config"
+        print_info "Resolve the conflict manually, then rerun: ${SCRIPT_NAME} stow"
     fi
 }
 
@@ -208,7 +202,7 @@ cmd_help() {
     printf "    %s [OPTIONS] COMMAND [ARGS]\n\n" "$SCRIPT_NAME"
 
     printf "${BOLD}COMMANDS:${RESET}\n"
-    printf "    init                Initialize and install dotfiles\n"
+    printf "    init                Initialize dotfiles without adopting existing config files\n"
     printf "    doctor              Run diagnostics and check installation\n"
     printf "    stow                Create symlinks for dotfiles using GNU Stow\n"
     printf "    help                Show this help message (default)\n\n"

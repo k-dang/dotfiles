@@ -69,7 +69,7 @@ dotfiles/
 - **Fixed location**: Always installs to `~/dotfiles` (or `$HOME\dotfiles` on Windows)
 - **Modular structure**: Easy to add new aliases, paths, and tools
 - **Cross-platform**: Same structure works on macOS, Linux, and Windows
-- **Install-time backups**: Initial setup backs up existing configs before overwriting
+- **Safe initialization**: Initial setup adds managed symlinks without adopting existing config files
 - **Tool installation**: Auto-installs tools like `gum`, `bat`, `fzf`, `lazygit`, `zoxide`, `oh-my-posh` during setup
 
 ## Dot CLI
@@ -84,9 +84,11 @@ Use the CLI in two phases:
 2. Use `dot doctor` to verify dependencies and shell wiring
 3. Use `dot stow` when you changed files under `home/` and want to restow them
 
-`dot init` is the first-run command. It installs tools, backs up an existing `~/.config` once if needed, adopts existing config files into the stow package, configures your shell, and makes scripts in `bin/` executable.
+`dot init` is the first-run command. It installs tools, performs a non-destructive initial stow, configures your shell, and makes scripts in `bin/` executable.
 
-`dot stow` is the safe repeat command. It uses `stow --restow` so rerunning it reconciles managed symlinks without creating a fresh `~/.config` backup each time.
+`dot stow` is the safe repeat command. It uses `stow --restow` so rerunning it reconciles managed symlinks already managed by stow.
+
+If `dot init` finds an existing real file that conflicts with a managed path under `home/`, it fails fast and leaves that file untouched.
 
 ### Commands
 
@@ -276,7 +278,7 @@ $HOME\dotfiles\bin\update.ps1
 
 ### macOS
 
-Backups are created as `~/.zshrc.backup.YYYYMMDD_HHMMSS`
+Backups are created as `~/.zshrc.backup.YYYYMMDD_HHMMSS` when `dot init` appends the dotfiles source line to an existing `~/.zshrc`.
 
 To restore:
 
@@ -341,19 +343,21 @@ Preference is to use [Nerd Fonts](https://www.nerdfonts.com/) to cover icons and
 
 The CLI already wraps the recommended stow behavior:
 
-- `dot init` performs first-time adoption
+- `dot init` performs a non-destructive first-time stow
 - `dot stow` performs repeatable restows
 
 If you want to run GNU Stow manually, use these patterns.
 
-First-time adoption:
+First-time stow:
 ```bash
-stow -nv --no-folding --adopt -t ~ home
+stow -nv --no-folding -t ~ home
 ```
 
 ```bash
-stow --no-folding --adopt -t ~ home
+stow --no-folding -t ~ home
 ```
+
+If Stow reports a conflict, an existing real file is already present at the target path. Move it aside or merge it manually before rerunning the command.
 
 Repeatable restow:
 
