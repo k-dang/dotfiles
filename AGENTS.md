@@ -18,7 +18,7 @@ Shell config entry points (`shell/zsh.sh` and `shell/powershell.ps1`) source mod
 - **Shell configs**: Sourced from `~/.zshrc` (not symlinked)
 - **~/.config files**: Managed via GNU stow (if installed)
   - Example: `~/.config/git/config` → `~/dotfiles/home/.config/git/config`
-  - Backup created at `~/.config.backup.YYYYMMDD_HHMMSS` before stowing
+  - Initial adoption may create a backup at `~/.config.backup.YYYYMMDD_HHMMSS`
 
 Key modules:
 

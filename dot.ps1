@@ -70,12 +70,6 @@ function Invoke-Sync {
 
     Ensure-Directory -Path $TARGET_CONFIG_DIR
 
-    if (Test-DirectoryHasContent -Path $TARGET_CONFIG_DIR) {
-        $backupPath = "$TARGET_CONFIG_DIR.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-        Copy-Item -LiteralPath $TARGET_CONFIG_DIR -Destination $backupPath -Recurse -Force
-        Write-Info "Backed up existing .config to $backupPath"
-    }
-
     $items = Get-ChildItem -LiteralPath $SOURCE_CONFIG_DIR -Force
     if ($items.Count -eq 0) {
         Write-Warn "Source .config is empty: $SOURCE_CONFIG_DIR"
