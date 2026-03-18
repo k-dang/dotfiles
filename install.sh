@@ -24,32 +24,17 @@ fi
 if command -v stow &>/dev/null; then
 	echo "Setting up GNU stow for ~/.config..."
 
-	# Backup existing ~/.config if it exists and is not already a symlink
-	if [ -d "$HOME/.config" ] && [ ! -L "$HOME/.config" ]; then
-		BACKUP_CONFIG="$HOME/.config.backup.$(date +%Y%m%d_%H%M%S)"
-		echo "Backing up existing ~/.config to $BACKUP_CONFIG..."
-		cp -r "$HOME/.config" "$BACKUP_CONFIG"
-	fi
-
 	# Run stow from dotfiles directory
 	cd "$DOTFILES_PATH"
 	if stow --target="$HOME" --no-folding home 2>/dev/null; then
 		echo "✓ Successfully stowed ~/.config"
 	else
 		echo "⚠️  Warning: stow command failed. You may need to manually manage ~/.config"
-		echo "   Backup preserved at: $BACKUP_CONFIG"
 	fi
 else
 	echo "⚠️  GNU stow not found. Skipping ~/.config symlink management."
 	echo "   Install stow for automatic ~/.config management: brew install stow"
 	echo "   Or manually copy files from $DOTFILES_PATH/home/.config/ to ~/.config/"
-fi
-
-# Backup existing .zshrc
-if [ -f "$HOME/.zshrc" ]; then
-	BACKUP_FILE="$HOME/.zshrc.backup.$(date +%Y%m%d_%H%M%S)"
-	echo "Backing up existing .zshrc to $BACKUP_FILE..."
-	cp "$HOME/.zshrc" "$BACKUP_FILE"
 fi
 
 # Ensure .zshrc sources dotfiles

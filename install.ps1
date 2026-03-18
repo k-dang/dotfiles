@@ -52,13 +52,6 @@ if (Test-Path $toolsPath) {
     . $toolsPath
 }
 
-# Backup existing profile
-if (Test-Path $PROFILE) {
-    $BACKUP_FILE = "$PROFILE.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-    Write-Host "Backing up existing profile to $BACKUP_FILE..." -ForegroundColor Yellow
-    Copy-Item $PROFILE $BACKUP_FILE -Force
-}
-
 # Ensure profile sources dotfiles
 Write-Host "Ensuring PowerShell profile sources dotfiles..." -ForegroundColor Cyan
 $dotfilesLine = ". `"$HOME\dotfiles\shell\powershell.ps1`""

@@ -278,25 +278,11 @@ $HOME\dotfiles\bin\update.ps1
 
 ### macOS
 
-Backups are created as `~/.zshrc.backup.YYYYMMDD_HHMMSS` when `dot init` appends the dotfiles source line to an existing `~/.zshrc`.
-
-To restore:
-
-```bash
-cp ~/.zshrc.backup.YYYYMMDD_HHMMSS ~/.zshrc
-source ~/.zshrc
-```
+`dot init` updates `~/.zshrc` in place and does not create automatic backups.
 
 ### Windows
 
-Backups are created as `$PROFILE.backup.YYYYMMDD_HHMMSS`
-
-To restore:
-
-```powershell
-Copy-Item $PROFILE.backup.YYYYMMDD_HHMMSS $PROFILE
-. $PROFILE
-```
+`dot init` updates `$PROFILE` in place and does not create automatic backups.
 
 ## Available Aliases
 
