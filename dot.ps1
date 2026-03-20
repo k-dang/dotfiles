@@ -62,13 +62,25 @@ function Ensure-Directory {
 }
 
 function Invoke-Sync {
+    param([switch]$DryRun)
+
     Write-Header "Syncing config files"
 
     if (-not (Test-Path -LiteralPath $SOURCE_CONFIG_DIR -PathType Container)) {
         throw "Source directory not found: $SOURCE_CONFIG_DIR"
     }
 
-    Ensure-Directory -Path $TARGET_CONFIG_DIR
+    if (Test-Path -LiteralPath $TARGET_CONFIG_DIR -PathType Container) {
+        if ($DryRun) {
+            Write-Info "Would use existing target directory: $TARGET_CONFIG_DIR"
+        }
+    }
+    elseif ($DryRun) {
+        Write-Info "Would create target directory: $TARGET_CONFIG_DIR"
+    }
+    else {
+        Ensure-Directory -Path $TARGET_CONFIG_DIR
+    }
 
     $items = Get-ChildItem -LiteralPath $SOURCE_CONFIG_DIR -Force
     if ($items.Count -eq 0) {
@@ -76,12 +88,23 @@ function Invoke-Sync {
     }
     else {
         foreach ($item in $items) {
-            Copy-Item -LiteralPath $item.FullName -Destination $TARGET_CONFIG_DIR -Recurse -Force
+            if ($DryRun) {
+                Write-Info "Would copy $($item.Name) to $TARGET_CONFIG_DIR"
+            }
+            else {
+                Copy-Item -LiteralPath $item.FullName -Destination $TARGET_CONFIG_DIR -Recurse -Force
+            }
         }
     }
 
-    Write-Success "Synced $SOURCE_CONFIG_DIR to $TARGET_CONFIG_DIR"
-    Write-Info "Non-destructive sync: existing extra files were not deleted"
+    if ($DryRun) {
+        Write-Success "Dry run complete for $SOURCE_CONFIG_DIR to $TARGET_CONFIG_DIR"
+        Write-Info "No files were copied"
+    }
+    else {
+        Write-Success "Synced $SOURCE_CONFIG_DIR to $TARGET_CONFIG_DIR"
+        Write-Info "Non-destructive sync: existing extra files were not deleted"
+    }
 }
 
 function Test-WriteAccess {
@@ -172,6 +195,7 @@ function Show-Help {
     Write-Host ""
     Write-Host "OPTIONS:"
     Write-Host "  --dotfiles-dir PATH  Override dotfiles directory"
+    Write-Host "  --dry-run            Preview sync changes without copying"
     Write-Host "  --version            Show version information"
     Write-Host "  -h, --help           Show this help message"
     Write-Host ""
@@ -213,10 +237,24 @@ function Main {
     Resolve-Paths
 
     $command = if ($remaining.Count -gt 0) { $remaining[0] } else { "help" }
+    $commandArgs = if ($remaining.Count -gt 1) { $remaining[1..($remaining.Count - 1)] } else { @() }
 
     switch ($command) {
         "sync" {
-            Invoke-Sync
+            $dryRun = $false
+
+            foreach ($commandArg in $commandArgs) {
+                switch ($commandArg) {
+                    "--dry-run" {
+                        $dryRun = $true
+                    }
+                    default {
+                        throw "Unknown option for sync: $commandArg"
+                    }
+                }
+            }
+
+            Invoke-Sync -DryRun:$dryRun
             return 0
         }
         "doctor" {
