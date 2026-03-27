@@ -83,6 +83,7 @@ Use the CLI in two phases:
 1. Bootstrap the machine with `dot init`
 2. Use `dot doctor` to verify dependencies and shell wiring
 3. Use `dot stow` when you changed files under `home/` and want to restow them
+4. On Windows, use `pwsh .\dot.ps1 sync` when you want to copy managed home directories like `.config` and `.agents`
 
 `dot init` is the first-run command. It installs tools, performs a non-destructive initial stow, configures your shell, and makes scripts in `bin/` executable.
 
@@ -128,6 +129,17 @@ source ~/.zshrc
 ```bash
 ~/dotfiles/dot stow
 ```
+
+#### Windows sync for copied home directories
+
+```powershell
+$HOME\dotfiles\dot.ps1 sync
+```
+
+`dot.ps1 sync` currently copies:
+
+- `home/.config/*` -> `$HOME/.config/`
+- `home/.agents/*` -> `$HOME/.agents/`
 
 You can run `~/dotfiles/dot help` at any time to see the current command list.
 

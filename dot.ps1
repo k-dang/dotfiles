@@ -7,8 +7,7 @@ $SCRIPT_NAME = "dot"
 $VERSION = "0.1.0"
 
 $DOTFILES_DIR = $PSScriptRoot
-$SOURCE_CONFIG_DIR = ""
-$TARGET_CONFIG_DIR = ""
+$SYNC_PAIRS = @()
 
 function Write-Header {
     param([Parameter(Mandatory)][string]$Message)
@@ -37,8 +36,18 @@ function Write-ErrorMsg {
 }
 
 function Resolve-Paths {
-    $script:SOURCE_CONFIG_DIR = Join-Path $DOTFILES_DIR "home/.config"
-    $script:TARGET_CONFIG_DIR = Join-Path $HOME ".config"
+    $script:SYNC_PAIRS = @(
+        [pscustomobject]@{
+            Label = ".config"
+            Source = Join-Path $DOTFILES_DIR "home/.config"
+            Target = Join-Path $HOME ".config"
+        },
+        [pscustomobject]@{
+            Label = ".agents"
+            Source = Join-Path $DOTFILES_DIR "home/.agents"
+            Target = Join-Path $HOME ".agents"
+        }
+    )
 }
 
 function Test-DirectoryHasContent {
@@ -61,48 +70,59 @@ function Ensure-Directory {
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
 }
 
-function Invoke-Sync {
-    param([switch]$DryRun)
+function Invoke-SyncPath {
+    param(
+        [Parameter(Mandatory)]$SyncPair,
+        [switch]$DryRun
+    )
 
-    Write-Header "Syncing config files"
-
-    if (-not (Test-Path -LiteralPath $SOURCE_CONFIG_DIR -PathType Container)) {
-        throw "Source directory not found: $SOURCE_CONFIG_DIR"
+    if (-not (Test-Path -LiteralPath $SyncPair.Source -PathType Container)) {
+        throw "Source directory not found: $($SyncPair.Source)"
     }
 
-    if (Test-Path -LiteralPath $TARGET_CONFIG_DIR -PathType Container) {
+    if (Test-Path -LiteralPath $SyncPair.Target -PathType Container) {
         if ($DryRun) {
-            Write-Info "Would use existing target directory: $TARGET_CONFIG_DIR"
+            Write-Info "Would use existing target directory: $($SyncPair.Target)"
         }
     }
     elseif ($DryRun) {
-        Write-Info "Would create target directory: $TARGET_CONFIG_DIR"
+        Write-Info "Would create target directory: $($SyncPair.Target)"
     }
     else {
-        Ensure-Directory -Path $TARGET_CONFIG_DIR
+        Ensure-Directory -Path $SyncPair.Target
     }
 
-    $items = Get-ChildItem -LiteralPath $SOURCE_CONFIG_DIR -Force
+    $items = @(Get-ChildItem -LiteralPath $SyncPair.Source -Force)
     if ($items.Count -eq 0) {
-        Write-Warn "Source .config is empty: $SOURCE_CONFIG_DIR"
+        Write-Warn "Source $($SyncPair.Label) is empty: $($SyncPair.Source)"
+        return
     }
-    else {
-        foreach ($item in $items) {
-            if ($DryRun) {
-                Write-Info "Would copy $($item.Name) to $TARGET_CONFIG_DIR"
-            }
-            else {
-                Copy-Item -LiteralPath $item.FullName -Destination $TARGET_CONFIG_DIR -Recurse -Force
-            }
+
+    foreach ($item in $items) {
+        if ($DryRun) {
+            Write-Info "Would copy $($item.Name) to $($SyncPair.Target)"
         }
+        else {
+            Copy-Item -LiteralPath $item.FullName -Destination $SyncPair.Target -Recurse -Force
+        }
+    }
+}
+
+function Invoke-Sync {
+    param([switch]$DryRun)
+
+    Write-Header "Syncing managed home directories"
+
+    foreach ($syncPair in $SYNC_PAIRS) {
+        Invoke-SyncPath -SyncPair $syncPair -DryRun:$DryRun
     }
 
     if ($DryRun) {
-        Write-Success "Dry run complete for $SOURCE_CONFIG_DIR to $TARGET_CONFIG_DIR"
+        Write-Success "Dry run complete for managed home directories"
         Write-Info "No files were copied"
     }
     else {
-        Write-Success "Synced $SOURCE_CONFIG_DIR to $TARGET_CONFIG_DIR"
+        Write-Success "Synced managed home directories"
         Write-Info "Non-destructive sync: existing extra files were not deleted"
     }
 }
@@ -133,14 +153,6 @@ function Invoke-Doctor {
         $issues++
     }
 
-    if (Test-Path -LiteralPath $SOURCE_CONFIG_DIR -PathType Container) {
-        Write-Success "Source config exists: $SOURCE_CONFIG_DIR"
-    }
-    else {
-        Write-ErrorMsg "Source config missing: $SOURCE_CONFIG_DIR"
-        $issues++
-    }
-
     if ([string]::IsNullOrWhiteSpace($HOME)) {
         Write-ErrorMsg "HOME is not set"
         $issues++
@@ -153,22 +165,32 @@ function Invoke-Doctor {
         $issues++
     }
 
-    try {
-        Ensure-Directory -Path $TARGET_CONFIG_DIR
-        Write-Success "Target config exists or was created: $TARGET_CONFIG_DIR"
-    }
-    catch {
-        Write-ErrorMsg "Cannot create target config directory: $TARGET_CONFIG_DIR"
-        $issues++
-    }
-
-    if (Test-Path -LiteralPath $TARGET_CONFIG_DIR -PathType Container) {
-        if (Test-WriteAccess -Directory $TARGET_CONFIG_DIR) {
-            Write-Success "Write access confirmed for: $TARGET_CONFIG_DIR"
+    foreach ($syncPair in $SYNC_PAIRS) {
+        if (Test-Path -LiteralPath $syncPair.Source -PathType Container) {
+            Write-Success "Source $($syncPair.Label) exists: $($syncPair.Source)"
         }
         else {
-            Write-ErrorMsg "No write access to: $TARGET_CONFIG_DIR"
+            Write-ErrorMsg "Source $($syncPair.Label) missing: $($syncPair.Source)"
             $issues++
+        }
+
+        try {
+            Ensure-Directory -Path $syncPair.Target
+            Write-Success "Target $($syncPair.Label) exists or was created: $($syncPair.Target)"
+        }
+        catch {
+            Write-ErrorMsg "Cannot create target $($syncPair.Label): $($syncPair.Target)"
+            $issues++
+        }
+
+        if (Test-Path -LiteralPath $syncPair.Target -PathType Container) {
+            if (Test-WriteAccess -Directory $syncPair.Target) {
+                Write-Success "Write access confirmed for: $($syncPair.Target)"
+            }
+            else {
+                Write-ErrorMsg "No write access to: $($syncPair.Target)"
+                $issues++
+            }
         }
     }
 
@@ -189,8 +211,8 @@ function Show-Help {
     Write-Host "  .\dot.ps1 [OPTIONS] COMMAND"
     Write-Host ""
     Write-Host "COMMANDS:"
-    Write-Host "  sync      Sync home/.config to `$HOME/.config"
-    Write-Host "  doctor    Run diagnostics"
+    Write-Host "  sync      Sync home/.config and home/.agents into `$HOME"
+    Write-Host "  doctor    Run diagnostics for managed sync paths"
     Write-Host "  help      Show this help message"
     Write-Host ""
     Write-Host "OPTIONS:"
