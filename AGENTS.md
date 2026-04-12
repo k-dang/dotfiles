@@ -7,7 +7,7 @@ Cross-platform dotfiles repository supporting macOS (zsh) and Windows (PowerShel
 - `install.sh` / `install.ps1` - Platform installers
 - `shell/` - Entry-point shell config scripts
 - `modules/` - Reusable shell modules and aliases
-- `home/` - Files intended for the home directory (for example `~/.config` via stow and `~/.agents` via `dot.ps1 sync`)
+- `home/` - Files intended for the home directory (for example `~/.config` via stow and top-level directories copied into `~` via `dot.ps1 sync`)
 
 ## Architecture
 
@@ -18,7 +18,7 @@ Shell config entry points (`shell/zsh.sh` and `shell/powershell.ps1`) source mod
 - **Shell configs**: Sourced from `~/.zshrc` (not symlinked)
 - **~/.config files**: Managed via GNU stow (if installed)
   - Example: `~/.config/git/config` → `~/dotfiles/home/.config/git/config`
-- **~/.agents files**: Copied by `dot.ps1 sync`
+- **Managed home directories**: Top-level directories under `home/` are copied by `dot.ps1 sync`
   - Example: `~/.agents/skills/...` → `~/dotfiles/home/.agents/skills/...`
 
 Key modules:
@@ -34,6 +34,7 @@ Key modules:
 - `modules/local.example.{sh,ps1}` - Template for machine-specific config
 - `home/.config/` - Stowed app configs (e.g., git)
 - `home/.agents/` - Agent configuration copied into `~/.agents`
+- `home/.claude/` - Claude configuration copied into `~/.claude`
 
 ## Conventions
 

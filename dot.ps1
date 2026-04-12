@@ -36,17 +36,23 @@ function Write-ErrorMsg {
 }
 
 function Resolve-Paths {
+    $managedHomePath = Join-Path $DOTFILES_DIR "home"
+
+    if (-not (Test-Path -LiteralPath $managedHomePath -PathType Container)) {
+        $script:SYNC_PAIRS = @()
+        return
+    }
+
     $script:SYNC_PAIRS = @(
-        [pscustomobject]@{
-            Label = ".config"
-            Source = Join-Path $DOTFILES_DIR "home/.config"
-            Target = Join-Path $HOME ".config"
-        },
-        [pscustomobject]@{
-            Label = ".agents"
-            Source = Join-Path $DOTFILES_DIR "home/.agents"
-            Target = Join-Path $HOME ".agents"
-        }
+        Get-ChildItem -LiteralPath $managedHomePath -Force -Directory |
+            Sort-Object -Property Name |
+            ForEach-Object {
+                [pscustomobject]@{
+                    Label = $_.Name
+                    Source = $_.FullName
+                    Target = Join-Path $HOME $_.Name
+                }
+            }
     )
 }
 
@@ -112,6 +118,11 @@ function Invoke-Sync {
     param([switch]$DryRun)
 
     Write-Header "Syncing managed home directories"
+
+    if ($SYNC_PAIRS.Count -eq 0) {
+        Write-Warn "No managed directories found under $(Join-Path $DOTFILES_DIR 'home')"
+        return
+    }
 
     foreach ($syncPair in $SYNC_PAIRS) {
         Invoke-SyncPath -SyncPair $syncPair -DryRun:$DryRun
@@ -211,7 +222,7 @@ function Show-Help {
     Write-Host "  .\dot.ps1 [OPTIONS] COMMAND"
     Write-Host ""
     Write-Host "COMMANDS:"
-    Write-Host "  sync      Sync home/.config and home/.agents into `$HOME"
+    Write-Host "  sync      Sync top-level directories from home/ into `$HOME"
     Write-Host "  doctor    Run diagnostics for managed sync paths"
     Write-Host "  help      Show this help message"
     Write-Host ""
