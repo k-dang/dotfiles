@@ -1,6 +1,6 @@
 ---
 name: do-work
-description: Default workflow for executing a unit of work in a repository — scope and plan, implement, then validate via the repository's own feedback loops. Use whenever the user asks you to build, add, fix, refactor, migrate, or implement anything non-trivial in a codebase. This is the right skill to reach for any time a task involves understanding existing code, making changes, and verifying those changes actually work. Prefer this over diving straight into edits whenever the task is larger than a single obvious line change.
+description: "Execute a unit of work end-to-end: plan, implement, validate with typecheck and tests, then commit. Use when user wants to do work, build a feature, fix a bug, or implement a phase from a plan."
 disable-model-invocation: true
 ---
 
@@ -57,7 +57,7 @@ Each test should target one thin vertical slice through the system. Do not write
 
 ### 5. Validate via the Repository's Feedback Loops
 
-This is the phase that makes the work *done* rather than *probably done*. Run the feedback loops you identified in Phase 1c, in roughly this order (fastest and most specific first):
+This is the phase that makes the work *done* rather than *probably done*. Run the feedback loops you identified in Phase 3, in roughly this order (fastest and most specific first):
 
 1. **Targeted tests** — Run the tests for the file or module you changed. Fast, specific, high signal.
 2. **Type checker / compiler** — Catches whole classes of bugs before the test suite does.
