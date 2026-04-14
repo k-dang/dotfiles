@@ -4,6 +4,16 @@ function cc
     claude 
 }
 
+function ccy
+{
+    claude --dangerously-skip-permissions
+}
+
+function cca
+{
+    claude --enable-auto-mode
+}
+
 # create a new worktree + branch, then step into it
 function ga
 {

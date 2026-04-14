@@ -1,5 +1,7 @@
 # Misc aliases
 alias cc='claude'
+alias ccy='claude --dangerously-skip-permissions'
+alias cca='claude --enable-auto-mode'
 
 # eza (ls replacement)
 if command -v eza &>/dev/null; then
