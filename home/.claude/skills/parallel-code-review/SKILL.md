@@ -1,5 +1,5 @@
 ---
-name: code-review
+name: parallel-code-review
 description: Runs code-reviewer subagents
 allowed-tools: Read, Grep, Glob
 disable-model-invocation: true
