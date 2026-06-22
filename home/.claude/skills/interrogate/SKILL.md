@@ -17,6 +17,7 @@ Identify what to review from context:
 - If the user points at specific files or a diff, use that
 - If on a feature branch, run `git diff main...HEAD` (or the appropriate base branch) to get the full changeset
 - If the user's message references recent work, gather the relevant files
+- Design / plan / ADR docs (markdown) are in scope when the user explicitly names them as the target. State in Step 2's intent that this is a design review, not a code review, so reviewers calibrate the rubric accordingly.
 
 Collect the material into a clear package: the diff (or file contents), and any surrounding context files the reviewers will need to understand the code.
 
@@ -33,21 +34,22 @@ Write one clear paragraph. This is critical: reviewers challenge whether the wor
 
 ## Step 3, Spawn Reviewers
 
-Launch all four in a single message using the Task tool. All four use Claude-family models with different capability profiles and get the same prompt built from the template in `references/reviewer-prompt.md`.
+Launch all four in a single message using the Agent tool. All four use Claude-family models and get the same prompt built from the template in `references/reviewer-prompt.md`. The adversarial signal comes from independent attempts; the two-tier split (opus / sonnet) adds capability diversity on top.
 
 | Subagent | Model |
 |----------|-------|
-| Reviewer A | `claude-opus-4-8-thinking-xhigh` |
-| Reviewer B | `claude-opus-4-7-thinking-high` |
-| Reviewer C | `claude-sonnet-4-6-thinking-high` |
-| Reviewer D | `claude-sonnet-4-6` |
+| Reviewer A | `opus` |
+| Reviewer B | `opus` |
+| Reviewer C | `sonnet` |
+| Reviewer D | `sonnet` |
 
 For each reviewer:
-- `subagent_type`: `generalPurpose`
-- `model`: the model from the table
-- `readonly`: `true`
+- `subagent_type`: `general-purpose`
+- `model`: the value from the table above
 
-If the model slug in the table above is rejected as unresolvable when you try to spawn the subagent, check the current list of valid slugs in the Task tool's error message, pick the closest equivalent Claude-family model, spawn with the valid slug, and open a separate PR to update this table. Do not block the review on the slug issue.
+The Agent tool's `model` parameter accepts the short tier name (`sonnet | opus | haiku | fable`); specific dated slugs and per-call reasoning-effort knobs are not accepted on direct Agent calls. If a value in the table is rejected as unresolvable, check the current list of valid values in the Agent tool's error message, pick the closest equivalent, spawn with the valid value, and open a separate PR to update this table. Do not block the review on the slug issue.
+
+The reviewers must not modify files. Enforce this in the prompt itself ("Do not edit, write, or otherwise modify any files. Output your findings only.") — the Agent tool has no `readonly` flag, so this is a prompt-level discipline.
 
 Read `references/reviewer-prompt.md` and fill in the template with:
 1. The stated intent
