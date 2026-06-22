@@ -6,7 +6,19 @@ disable-model-invocation: true
 
 This skill takes the current conversation context and codebase understanding and produces a PRD. Do NOT interview the user — just synthesize what you already know.
 
-The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
+## Repository conventions
+
+Use local Markdown as the issue tracker:
+
+- One feature per directory: `.scratch/<feature-slug>/`
+- The PRD lives at `.scratch/<feature-slug>/PRD.md`
+- Triage state is a `Status:` line near the top of the file
+- The AFK-ready state is `ready-for-agent`
+- Comments append under a `## Comments` heading
+
+"Publish the PRD" means create or replace `.scratch/<feature-slug>/PRD.md`, creating the feature directory if needed, and put `Status: ready-for-agent` before the first heading.
+
+Assume a single domain context. Before exploring, read root `CONTEXT.md` and relevant ADRs under `docs/adr/` when they exist. If either is absent, proceed silently.
 
 ## Process
 
@@ -16,7 +28,7 @@ The issue tracker and triage label vocabulary should have been provided to you �
 
 Check with the user that these seams match their expectations.
 
-3. Write the PRD using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage.
+3. Write the PRD using the template below, then publish it to `.scratch/<feature-slug>/PRD.md` with `Status: ready-for-agent` before the first heading. No additional triage is needed.
 
 <prd-template>
 

@@ -7,6 +7,8 @@ description: Shared vocabulary for designing deep modules. Use when the user wan
 
 Design **deep modules**: a lot of behaviour behind a small interface, placed at a clean seam, testable through that interface. Use this language and these principles wherever code is being designed or restructured. The aim is leverage for callers, locality for maintainers, and testability for everyone.
 
+Assume a single domain context. Before applying this vocabulary to a codebase, read root `CONTEXT.md` and relevant ADRs under `docs/adr/` when they exist. If either is absent, proceed silently.
+
 ## Glossary
 
 Use these terms exactly — don't substitute "component," "service," "API," or "boundary." Consistent language is the whole point.

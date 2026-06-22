@@ -8,7 +8,20 @@ disable-model-invocation: true
 
 Break a plan into independently-grabbable issues using vertical slices (tracer bullets).
 
-The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
+## Issue tracker
+
+Issues live as local markdown in the current repo under `.scratch/<feature-slug>/`:
+
+- One feature per directory: `.scratch/<feature-slug>/`
+- Implementation issues: `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
+- Triage state is recorded as a `Status:` line near the top of each issue file
+- Comments append at the bottom under a `## Comments` heading
+
+Triage state values: `needs-triage`, `needs-info`, `ready-for-agent` (AFK-ready), `ready-for-human`, `wontfix`.
+
+"Publish an issue" means create a new markdown file under `.scratch/<feature-slug>/issues/` (creating the directory if needed). "Fetch a ticket" means read the file at the referenced path — the user normally passes the path or number directly.
+
+Assume a single domain context. Before exploring, read root `CONTEXT.md` and relevant ADRs under `docs/adr/` when they exist. If either is absent, proceed silently.
 
 ## Process
 
@@ -52,7 +65,7 @@ Iterate until the user approves the breakdown.
 
 ### 5. Publish the issues to the issue tracker
 
-For each approved slice, publish a new issue to the issue tracker. Use the issue body template below. These issues are considered ready for AFK agents, so publish them with the correct triage label unless instructed otherwise.
+For each approved slice, create a new issue file under `.scratch/<feature-slug>/issues/`. Use the issue body template below. These issues are considered ready for AFK agents, so set `Status: ready-for-agent` near the top of each unless instructed otherwise.
 
 Publish issues in dependency order (blockers first) so you can reference real issue identifiers in the "Blocked by" field.
 
