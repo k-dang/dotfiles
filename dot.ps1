@@ -50,20 +50,10 @@ function Resolve-Paths {
                 [pscustomobject]@{
                     Label = $_.Name
                     Source = $_.FullName
-                    Target = Join-Path $HOME $_.Name
+                    Target = if ([string]::IsNullOrWhiteSpace($HOME)) { $null } else { Join-Path $HOME $_.Name }
                 }
             }
     )
-}
-
-function Test-DirectoryHasContent {
-    param([Parameter(Mandatory)][string]$Path)
-
-    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
-        return $false
-    }
-
-    return $null -ne (Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue | Select-Object -First 1)
 }
 
 function Ensure-Directory {
@@ -74,6 +64,51 @@ function Ensure-Directory {
     }
 
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
+}
+
+function Test-ManagedPaths {
+    if ([string]::IsNullOrWhiteSpace($HOME)) {
+        Write-ErrorMsg "HOME is not set"
+        return $false
+    }
+
+    if (-not (Test-Path -LiteralPath $HOME -PathType Container)) {
+        Write-ErrorMsg "Home directory does not exist: $HOME"
+        return $false
+    }
+
+    $managedHomePath = Join-Path $DOTFILES_DIR "home"
+    if (-not (Test-Path -LiteralPath $managedHomePath -PathType Container)) {
+        Write-ErrorMsg "Managed home directory not found: $managedHomePath"
+        return $false
+    }
+
+    if ($SYNC_PAIRS.Count -eq 0) {
+        Write-ErrorMsg "No managed directories found under $managedHomePath"
+        return $false
+    }
+
+    return $true
+}
+
+function Get-DescendantItems {
+    param([Parameter(Mandatory)][string]$Root)
+
+    $directories = New-Object System.Collections.Generic.Queue[string]
+    $directories.Enqueue($Root)
+
+    while ($directories.Count -gt 0) {
+        $directory = $directories.Dequeue()
+
+        foreach ($item in Get-ChildItem -LiteralPath $directory -Force | Sort-Object -Property FullName) {
+            Write-Output $item
+
+            $isReparsePoint = ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+            if ($item.PSIsContainer -and -not $isReparsePoint) {
+                $directories.Enqueue($item.FullName)
+            }
+        }
+    }
 }
 
 function Invoke-SyncPath {
@@ -119,9 +154,8 @@ function Invoke-Sync {
 
     Write-Header "Syncing managed home directories"
 
-    if ($SYNC_PAIRS.Count -eq 0) {
-        Write-Warn "No managed directories found under $(Join-Path $DOTFILES_DIR 'home')"
-        return
+    if (-not (Test-ManagedPaths)) {
+        return 1
     }
 
     foreach ($syncPair in $SYNC_PAIRS) {
@@ -136,25 +170,80 @@ function Invoke-Sync {
         Write-Success "Synced managed home directories"
         Write-Info "Non-destructive sync: existing extra files were not deleted"
     }
+
+    return 0
 }
 
-function Test-WriteAccess {
-    param([Parameter(Mandatory)][string]$Directory)
+function Invoke-Orphans {
+    Write-Header "Finding orphaned managed home paths"
 
-    try {
-        $tempFile = Join-Path $Directory ".dot-write-test-$([guid]::NewGuid().ToString('N')).tmp"
-        Set-Content -LiteralPath $tempFile -Value "ok" -Encoding UTF8
-        Remove-Item -LiteralPath $tempFile -Force
-        return $true
+    if (-not (Test-ManagedPaths)) {
+        return 1
     }
-    catch {
-        return $false
+
+    $orphanCount = 0
+    $issues = 0
+
+    foreach ($syncPair in $SYNC_PAIRS) {
+        if (-not (Test-Path -LiteralPath $syncPair.Source -PathType Container)) {
+            Write-ErrorMsg "Source $($syncPair.Label) missing: $($syncPair.Source)"
+            $issues++
+            continue
+        }
+
+        if (-not (Test-Path -LiteralPath $syncPair.Target)) {
+            Write-ErrorMsg "Target $($syncPair.Label) missing: $($syncPair.Target)"
+            $issues++
+            continue
+        }
+
+        if (-not (Test-Path -LiteralPath $syncPair.Target -PathType Container)) {
+            Write-ErrorMsg "Target $($syncPair.Label) is not a directory: $($syncPair.Target)"
+            $issues++
+            continue
+        }
+
+        $targetItem = Get-Item -LiteralPath $syncPair.Target -Force
+        $isReparsePoint = ($targetItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+        if ($isReparsePoint) {
+            Write-ErrorMsg "Target $($syncPair.Label) is a reparse point: $($syncPair.Target)"
+            $issues++
+            continue
+        }
+
+        $targetRoot = $targetItem.FullName
+
+        foreach ($item in Get-DescendantItems -Root $targetRoot) {
+            $relativePath = $item.FullName.Substring($targetRoot.Length).TrimStart([char[]]@('\', '/'))
+            $sourcePath = Join-Path $syncPair.Source $relativePath
+
+            if (-not (Test-Path -LiteralPath $sourcePath)) {
+                $kind = if ($item.PSIsContainer) { "directory" } else { "file" }
+                Write-Host "[ORPHAN] $kind $($item.FullName)" -ForegroundColor Yellow
+                $orphanCount++
+            }
+        }
     }
+
+    if ($issues -gt 0) {
+        Write-Header "Found $issues issue(s) while finding orphans"
+        return 1
+    }
+
+    if ($orphanCount -eq 0) {
+        Write-Success "No orphaned paths found"
+    }
+    else {
+        Write-Warn "Found $orphanCount orphaned path(s); no files were deleted"
+    }
+
+    return 0
 }
 
 function Invoke-Doctor {
     Write-Header "Running diagnostics"
     $issues = 0
+    $homeAvailable = $false
 
     if (Test-Path -LiteralPath $DOTFILES_DIR -PathType Container) {
         Write-Success "Dotfiles directory found: $DOTFILES_DIR"
@@ -170,10 +259,24 @@ function Invoke-Doctor {
     }
     elseif (Test-Path -LiteralPath $HOME -PathType Container) {
         Write-Success "Home directory available: $HOME"
+        $homeAvailable = $true
     }
     else {
         Write-ErrorMsg "Home directory does not exist: $HOME"
         $issues++
+    }
+
+    $managedHomePath = Join-Path $DOTFILES_DIR "home"
+    if (-not (Test-Path -LiteralPath $managedHomePath -PathType Container)) {
+        Write-ErrorMsg "Managed home directory not found: $managedHomePath"
+        $issues++
+    }
+    elseif ($SYNC_PAIRS.Count -eq 0) {
+        Write-ErrorMsg "No managed directories found under $managedHomePath"
+        $issues++
+    }
+    else {
+        Write-Success "Managed home directory found: $managedHomePath"
     }
 
     foreach ($syncPair in $SYNC_PAIRS) {
@@ -185,23 +288,20 @@ function Invoke-Doctor {
             $issues++
         }
 
-        try {
-            Ensure-Directory -Path $syncPair.Target
-            Write-Success "Target $($syncPair.Label) exists or was created: $($syncPair.Target)"
-        }
-        catch {
-            Write-ErrorMsg "Cannot create target $($syncPair.Label): $($syncPair.Target)"
-            $issues++
+        if (-not $homeAvailable) {
+            continue
         }
 
         if (Test-Path -LiteralPath $syncPair.Target -PathType Container) {
-            if (Test-WriteAccess -Directory $syncPair.Target) {
-                Write-Success "Write access confirmed for: $($syncPair.Target)"
-            }
-            else {
-                Write-ErrorMsg "No write access to: $($syncPair.Target)"
-                $issues++
-            }
+            Write-Success "Target $($syncPair.Label) exists: $($syncPair.Target)"
+        }
+        elseif (Test-Path -LiteralPath $syncPair.Target) {
+            Write-ErrorMsg "Target $($syncPair.Label) is not a directory: $($syncPair.Target)"
+            $issues++
+        }
+        else {
+            Write-ErrorMsg "Target $($syncPair.Label) missing: $($syncPair.Target)"
+            $issues++
         }
     }
 
@@ -223,7 +323,8 @@ function Show-Help {
     Write-Host ""
     Write-Host "COMMANDS:"
     Write-Host "  sync      Sync top-level directories from home/ into `$HOME"
-    Write-Host "  doctor    Run diagnostics for managed sync paths"
+    Write-Host "  doctor    Run read-only diagnostics for managed sync paths"
+    Write-Host "  orphans   List target paths that do not exist in home/"
     Write-Host "  help      Show this help message"
     Write-Host ""
     Write-Host "OPTIONS:"
@@ -238,6 +339,9 @@ function Main {
     param([string[]]$CliArgs)
 
     $remaining = New-Object System.Collections.Generic.List[string]
+    $dryRun = $false
+    $showHelp = $false
+    $showVersion = $false
 
     for ($i = 0; $i -lt $CliArgs.Count; $i++) {
         $arg = $CliArgs[$i]
@@ -250,16 +354,16 @@ function Main {
                 $i++
             }
             "--version" {
-                Write-Host "$SCRIPT_NAME version $VERSION"
-                return 0
+                $showVersion = $true
+            }
+            "--dry-run" {
+                $dryRun = $true
             }
             "-h" {
-                Show-Help
-                return 0
+                $showHelp = $true
             }
             "--help" {
-                Show-Help
-                return 0
+                $showHelp = $true
             }
             default {
                 [void]$remaining.Add($arg)
@@ -267,35 +371,42 @@ function Main {
         }
     }
 
-    Resolve-Paths
-
     $command = if ($remaining.Count -gt 0) { $remaining[0] } else { "help" }
-    $commandArgs = if ($remaining.Count -gt 1) { $remaining[1..($remaining.Count - 1)] } else { @() }
+    $commandArgs = @(
+        if ($remaining.Count -gt 1) {
+            $remaining[1..($remaining.Count - 1)]
+        }
+    )
 
     switch ($command) {
         "sync" {
-            $dryRun = $false
-
             foreach ($commandArg in $commandArgs) {
-                switch ($commandArg) {
-                    "--dry-run" {
-                        $dryRun = $true
-                    }
-                    default {
-                        throw "Unknown option for sync: $commandArg"
-                    }
-                }
+                throw "Unknown option for sync: $commandArg"
             }
-
-            Invoke-Sync -DryRun:$dryRun
-            return 0
         }
         "doctor" {
-            return (Invoke-Doctor)
+            if ($dryRun) {
+                throw "Option --dry-run is only valid with sync"
+            }
+            if ($commandArgs.Count -gt 0) {
+                throw "Unexpected argument for doctor: $($commandArgs[0])"
+            }
+        }
+        "orphans" {
+            if ($dryRun) {
+                throw "Option --dry-run is only valid with sync"
+            }
+            if ($commandArgs.Count -gt 0) {
+                throw "Unexpected argument for orphans: $($commandArgs[0])"
+            }
         }
         "help" {
-            Show-Help
-            return 0
+            if ($dryRun) {
+                throw "Option --dry-run is only valid with sync"
+            }
+            if ($commandArgs.Count -gt 0) {
+                throw "Unexpected argument for help: $($commandArgs[0])"
+            }
         }
         default {
             Write-ErrorMsg "Unknown command: $command"
@@ -303,6 +414,28 @@ function Main {
             return 1
         }
     }
+
+    if ($showVersion) {
+        Write-Host "$SCRIPT_NAME version $VERSION"
+        return 0
+    }
+
+    if ($showHelp -or $command -eq "help") {
+        Show-Help
+        return 0
+    }
+
+    Resolve-Paths
+
+    if ($command -eq "sync") {
+        return (Invoke-Sync -DryRun:$dryRun)
+    }
+
+    if ($command -eq "doctor") {
+        return (Invoke-Doctor)
+    }
+
+    return (Invoke-Orphans)
 }
 
 try {

@@ -144,6 +144,14 @@ Examples:
 - `home/.agents/*` -> `$HOME/.agents/`
 - `home/.claude/*` -> `$HOME/.claude/`
 
+To preview paths in those target directories that no longer exist in `home/`, run:
+
+```powershell
+$HOME\dotfiles\dot.ps1 orphans
+```
+
+`orphans` lists every unmatched file and directory. It does not delete anything or compare file contents.
+
 You can run `~/dotfiles/dot help` at any time to see the current command list.
 
 ## Verification
@@ -172,6 +180,9 @@ $HOME\dotfiles\bin\verify-setup.ps1
 
 # Test an alias
 gs
+
+# Run the dot.ps1 regression tests
+& $HOME\dotfiles\tests\dot.test.ps1
 ```
 
 ## Adding New Aliases
