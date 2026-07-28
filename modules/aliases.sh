@@ -2,7 +2,6 @@
 alias cc='claude'
 alias ccy='claude --dangerously-skip-permissions'
 alias cca='claude --enable-auto-mode'
-alias ccn='CLAUDE_CODE_NO_FLICKER=1 claude'
 
 # eza (ls replacement)
 if command -v eza &>/dev/null; then
