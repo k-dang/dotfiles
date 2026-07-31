@@ -1,6 +1,6 @@
 ---
-description: Create a Graphite stack PR with guided commit message
-allowed-tools: Bash(gt:*), Bash(git status:*), Bash(git diff:*), Bash(echo:*), Bash(fold:*), Bash(wc:*), Bash(gh:*)
+description: Create a GitHub stack PR with guided commit message
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(echo:*), Bash(fold:*), Bash(wc:*), Bash(gh:*)
 argument-hint: [motivation/context]
 ---
 
@@ -21,9 +21,9 @@ Unstaged changes (if nothing staged):
 
 ## Your Task
 
-Help me create a commit and submit it as a Graphite stack PR.
+Help me create a commit and submit it as a GitHub stacked PR.
 
-**IMPORTANT:** Always use Graphite (`gt`) commands - never bypass with raw git commands like `git commit`, `git push`, or `git checkout -b`. Graphite manages the stack state and using git directly will corrupt it.
+**IMPORTANT:** Use GitHub Stacks (`gh stack`) for stack, branch, commit, and submission operations. Never bypass stack management with `git commit`, `git push`, or `git checkout -b`.
 
 ### Step 1: Analyze the Changes
 
@@ -69,11 +69,24 @@ Create a short kebab-case branch name:
 - Lowercase, hyphens between words
 - No type prefix, just a descriptive slug
 
-### Step 5: Create the Branch and Commit
+### Step 5: Create the Stack Layer and Commit
 
-Show me the proposed commit message and branch name. Once I approve, run:
+Show me the proposed commit message and branch name. Once I approve, check whether the current branch belongs to a stack:
+
 ```bash
-gt create --all --no-interactive -m "$(cat <<'EOF'
+gh stack view --json
+```
+
+If it reports that the current branch is not part of a stack, initialize one:
+
+```bash
+gh stack init <branch-name>
+```
+
+Then create the commit. On a newly initialized empty layer, this commits there. On an existing populated stack, this creates a new layer on top:
+
+```bash
+gh stack add --all --message "$(cat <<'EOF'
 <subject line here>
 
 <wrapped body here>
@@ -85,10 +98,10 @@ EOF
 
 ### Step 6: Submit the PR
 
-Submit the PR as a draft:
+Submit the stack non-interactively. `--auto` creates new PRs as drafts unless `--open` is passed:
 
 ```bash
-gt submit --stack --no-interactive --draft
+gh stack submit --auto
 ```
 
 ### Step 7: Update PR Description
@@ -118,14 +131,20 @@ EOF
 
 ### Step 8: Output Slack Review Message
 
+Get the current top PR's title and URL with:
+
+```bash
+gh pr view --json title,url
+```
+
 Output both Slack-friendly message formats in a fenced markdown block for easy copy-paste:
 
 ```
 Single PR:
-[<commit subject>](<github-url>) ([graphite](<graphite-url>))
+[<commit subject>](<github-url>)
 
 Stack:
-[<top PR title>](<graphite-stack-url>)
+[<top PR title>](<top-pr-github-url>)
 ```
 
-Print the actual links (not placeholders) so they can be copied directly into Slack.
+GitHub shows stack context on each PR, so use the top PR URL for the stack link. Print actual links, not placeholders.
