@@ -59,9 +59,6 @@ Create a commit message following these rules:
 - Don't list affected files/classes/functions - that's redundant with the diff
 - Should answer: why is this change necessary, what problem does it solve
 
-**Trailer:**
-- Always append a blank line followed by: `Co-authored-by: Claude <noreply@anthropic.com>`
-
 ### Step 4: Generate Branch Name
 
 Create a short kebab-case branch name:
