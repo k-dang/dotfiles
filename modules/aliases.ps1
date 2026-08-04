@@ -15,41 +15,20 @@ function cca
 }
 
 # eza (ls replacement)
+#
+# Only ll and lt, unlike the zsh side which also defines ls and la. The coreutils
+# block in the PowerShell profile rewrites typed `ls`/`la` to coreutils ls.cmd
+# before they resolve, so eza versions of those two would never run.
 if (Get-Command eza -ErrorAction SilentlyContinue)
 {
-    # PowerShell resolves aliases before functions, so drop the built-in ls alias
-    Remove-Item Alias:ls -Force -ErrorAction SilentlyContinue
-
-    # eza on Windows prints nothing unless it gets an explicit path, so default to .
-    function Invoke-Eza
-    {
-        if (@($args | Where-Object { $_ -notlike '-*' }).Count -gt 0)
-        {
-            eza @args
-        } else
-        {
-            eza @args .
-        }
-    }
-
-    function ls
-    {
-        Invoke-Eza @args
-    }
-
     function ll
     {
-        Invoke-Eza -l @args
-    }
-
-    function la
-    {
-        Invoke-Eza -la @args
+        eza -l @args
     }
 
     function lt
     {
-        Invoke-Eza --tree @args
+        eza --tree @args
     }
 }
 
