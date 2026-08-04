@@ -14,6 +14,45 @@ function cca
     claude --enable-auto-mode
 }
 
+# eza (ls replacement)
+if (Get-Command eza -ErrorAction SilentlyContinue)
+{
+    # PowerShell resolves aliases before functions, so drop the built-in ls alias
+    Remove-Item Alias:ls -Force -ErrorAction SilentlyContinue
+
+    # eza on Windows prints nothing unless it gets an explicit path, so default to .
+    function Invoke-Eza
+    {
+        if (@($args | Where-Object { $_ -notlike '-*' }).Count -gt 0)
+        {
+            eza @args
+        } else
+        {
+            eza @args .
+        }
+    }
+
+    function ls
+    {
+        Invoke-Eza @args
+    }
+
+    function ll
+    {
+        Invoke-Eza -l @args
+    }
+
+    function la
+    {
+        Invoke-Eza -la @args
+    }
+
+    function lt
+    {
+        Invoke-Eza --tree @args
+    }
+}
+
 # create a new worktree + branch, then step into it
 function ga
 {
