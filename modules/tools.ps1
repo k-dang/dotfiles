@@ -188,6 +188,34 @@ function Install-Mise
     }
 }
 
+# Install eza if not present
+function Install-Eza
+{
+    if (Get-Command eza -ErrorAction SilentlyContinue)
+    {
+        Write-Host "eza is already installed" -ForegroundColor Green
+        return
+    }
+
+    Write-Host "Installing eza..." -ForegroundColor Cyan
+
+    if (Get-Command winget -ErrorAction SilentlyContinue)
+    {
+        winget install eza-community.eza --accept-source-agreements --accept-package-agreements
+    } elseif (Get-Command scoop -ErrorAction SilentlyContinue)
+    {
+        scoop install eza
+    } elseif (Get-Command choco -ErrorAction SilentlyContinue)
+    {
+        choco install eza
+    } else
+    {
+        Write-Warning "No supported package manager found (winget, scoop, choco)"
+        Write-Warning "Install eza manually: https://github.com/eza-community/eza"
+        return
+    }
+}
+
 # Auto-install tools
 Install-Gum
 Install-Bat
@@ -196,3 +224,4 @@ Install-Lazygit
 Install-OhMyPosh
 Install-Zoxide
 Install-Mise
+Install-Eza

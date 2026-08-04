@@ -90,9 +90,9 @@ stow_dotfiles() {
     fi
 
     if stow "${stow_args[@]}" home; then
-        print_success "Successfully stowed ~/.config"
+        print_success "Successfully stowed dotfiles from ${home_dir}"
     else
-        print_warning "Stow command failed, likely due to an existing conflicting file in ~/.config"
+        print_warning "Stow command failed, likely due to an existing conflicting file in \$HOME"
         print_info "Resolve the conflict manually, then rerun: ${SCRIPT_NAME} stow"
     fi
 }
