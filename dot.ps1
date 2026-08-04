@@ -91,17 +91,32 @@ function Test-ManagedPaths {
     return $true
 }
 
-function Get-DescendantItems {
-    param([Parameter(Mandatory)][string]$Root)
+function Get-OrphanItems {
+    param(
+        [Parameter(Mandatory)][string]$TargetRoot,
+        [Parameter(Mandatory)][string]$SourceRoot
+    )
 
     $directories = New-Object System.Collections.Generic.Queue[string]
-    $directories.Enqueue($Root)
+    $directories.Enqueue($TargetRoot)
 
     while ($directories.Count -gt 0) {
         $directory = $directories.Dequeue()
 
         foreach ($item in Get-ChildItem -LiteralPath $directory -Force | Sort-Object -Property FullName) {
-            Write-Output $item
+            $relativePath = $item.FullName.Substring($TargetRoot.Length).TrimStart([char[]]@('\', '/'))
+            $sourcePath = Join-Path $SourceRoot $relativePath
+
+            # Report the topmost orphan only. Everything under an orphaned directory is
+            # orphaned too, so descending adds no information and buries the report
+            # (node_modules, editor extensions, and caches run to thousands of entries).
+            if (-not (Test-Path -LiteralPath $sourcePath)) {
+                [pscustomobject]@{
+                    RelativePath = $relativePath
+                    IsDirectory = $item.PSIsContainer
+                }
+                continue
+            }
 
             $isReparsePoint = ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
             if ($item.PSIsContainer -and -not $isReparsePoint) {
@@ -174,6 +189,66 @@ function Invoke-Sync {
     return 0
 }
 
+function New-OrphanNode {
+    return @{
+        Children = @{}
+        IsOrphan = $false
+        IsDirectory = $false
+    }
+}
+
+function Add-OrphanNode {
+    param(
+        [Parameter(Mandatory)][hashtable]$Root,
+        [Parameter(Mandatory)][string]$RelativePath,
+        [Parameter(Mandatory)][bool]$IsDirectory
+    )
+
+    $node = $Root
+
+    foreach ($segment in ($RelativePath -split '[\\/]')) {
+        if (-not $node.Children.ContainsKey($segment)) {
+            $node.Children[$segment] = New-OrphanNode
+        }
+        $node = $node.Children[$segment]
+    }
+
+    $node.IsOrphan = $true
+    $node.IsDirectory = $IsDirectory
+}
+
+function Write-OrphanTree {
+    param(
+        [Parameter(Mandatory)][hashtable]$Node,
+        [string]$Prefix = ""
+    )
+
+    $names = @($Node.Children.Keys | Sort-Object)
+
+    for ($i = 0; $i -lt $names.Count; $i++) {
+        $name = $names[$i]
+        $child = $Node.Children[$name]
+        $isLast = $i -eq ($names.Count - 1)
+
+        # A node with children is a directory even when it is only there to group
+        # orphans below it, so it is not itself reported as an orphan.
+        $isDirectory = $child.IsDirectory -or $child.Children.Count -gt 0
+        $label = if ($isDirectory) { "$name/" } else { $name }
+
+        Write-Host "$Prefix$(if ($isLast) { "└─ " } else { "├─ " })" -ForegroundColor DarkGray -NoNewline
+        if ($child.IsOrphan) {
+            Write-Host $label -ForegroundColor Yellow
+        }
+        else {
+            Write-Host $label -ForegroundColor DarkGray
+        }
+
+        if ($child.Children.Count -gt 0) {
+            Write-OrphanTree -Node $child -Prefix "$Prefix$(if ($isLast) { "   " } else { "│  " })"
+        }
+    }
+}
+
 function Invoke-Orphans {
     Write-Header "Finding orphaned managed home paths"
 
@@ -182,6 +257,7 @@ function Invoke-Orphans {
     }
 
     $orphanCount = 0
+    $orphanedLabels = 0
     $issues = 0
 
     foreach ($syncPair in $SYNC_PAIRS) {
@@ -211,18 +287,24 @@ function Invoke-Orphans {
             continue
         }
 
-        $targetRoot = $targetItem.FullName
+        $tree = New-OrphanNode
+        $labelCount = 0
 
-        foreach ($item in Get-DescendantItems -Root $targetRoot) {
-            $relativePath = $item.FullName.Substring($targetRoot.Length).TrimStart([char[]]@('\', '/'))
-            $sourcePath = Join-Path $syncPair.Source $relativePath
-
-            if (-not (Test-Path -LiteralPath $sourcePath)) {
-                $kind = if ($item.PSIsContainer) { "directory" } else { "file" }
-                Write-Host "[ORPHAN] $kind $($item.FullName)" -ForegroundColor Yellow
-                $orphanCount++
-            }
+        foreach ($item in Get-OrphanItems -TargetRoot $targetItem.FullName -SourceRoot $syncPair.Source) {
+            Add-OrphanNode -Root $tree -RelativePath $item.RelativePath -IsDirectory $item.IsDirectory
+            $labelCount++
         }
+
+        $orphanCount += $labelCount
+        if ($labelCount -eq 0) {
+            continue
+        }
+
+        $orphanedLabels++
+        Write-Host ""
+        Write-Host $syncPair.Label -ForegroundColor Blue -NoNewline
+        Write-Host "  $labelCount orphaned" -ForegroundColor DarkGray
+        Write-OrphanTree -Node $tree
     }
 
     if ($issues -gt 0) {
@@ -234,7 +316,9 @@ function Invoke-Orphans {
         Write-Success "No orphaned paths found"
     }
     else {
-        Write-Warn "Found $orphanCount orphaned path(s); no files were deleted"
+        $directoryWord = if ($orphanedLabels -eq 1) { "directory" } else { "directories" }
+        Write-Host ""
+        Write-Warn "$orphanCount orphaned path(s) in $orphanedLabels managed $directoryWord; no files were deleted"
     }
 
     return 0

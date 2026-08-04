@@ -150,7 +150,9 @@ To preview paths in those target directories that no longer exist in `home/`, ru
 $HOME\dotfiles\dot.ps1 orphans
 ```
 
-`orphans` lists every unmatched file and directory. It does not delete anything or compare file contents.
+`orphans` prints a tree per managed directory. It reports the topmost unmatched path only — an
+orphaned directory is listed once rather than expanded into its whole subtree. It does not delete
+anything or compare file contents.
 
 You can run `~/dotfiles/dot help` at any time to see the current command list.
 
