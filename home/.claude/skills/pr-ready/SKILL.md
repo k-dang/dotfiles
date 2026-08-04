@@ -6,36 +6,35 @@ disable-model-invocation: true
 
 # pr-ready
 
-The pipeline runs in an isolated subagent so the main session never sees the loops' findings or file edits. Main session handles only pre-flight, confirm, and surfacing the final summary.
+The main session orchestrates directly. Nested Agent calls are unavailable in this harness, so a single outer subagent cannot fan out to `code-reviewer` / `thermo-nuclear-code-quality-review` — attempting it fails with "Agent tool unavailable in this session". Each subagent spawned below is prompted to return a **short summary of what it changed or found**, not full findings, to keep main-session context focused on orchestration.
 
-## In the main session
-
-### 1. Pre-flight
+## 1. Pre-flight
 
 Check there are uncommitted or unpushed changes on a non-default branch (not `main`/`master`). If not, stop and report.
 
-### 2. Confirm
+## 2. Step A — Simplify
 
-Confirm once with this exact prompt: *"Drive working tree to clean via simplify → review loop → thermo loop? (no commit, no push)"*. Wait for go.
+Invoke the `simplify` skill via the Skill tool. Let it complete its full pass.
 
-### 3. Dispatch
+## 3. Step B — Review loop (cap 5 rounds)
 
-Spawn one `claude` subagent via the Agent tool. Pass it the pipeline prompt below verbatim. Wait for it. Surface its returned summary verbatim and exit.
+Each round:
 
-Do not run any pipeline step in the main session — that defeats the isolation.
+1. In a single message, spawn three `code-reviewer` subagents in parallel via the Agent tool. Prompt each to review the current diff and return **only** a compact JSON list of actionable findings (file, line, one-sentence description, one-sentence fix). No prose.
+2. Dedupe findings across the three reports.
+3. Apply every actionable fix to the working tree yourself (Edit/Write). Do not spawn a fixer subagent — nested Agent calls won't work.
+4. If any fixes were applied, start a fresh round on the post-fix diff.
 
-## Pipeline prompt (for the subagent)
+Stop when a round returns zero actionable findings. If round 5 completes with findings still outstanding, halt the pipeline and report `"capped: review, <N findings remaining>"`.
 
-> Run the following pipeline against the current diff in this repository. Apply fixes to the working tree as you go. Do not commit, push, or open a PR. Return a one-line summary at the end.
->
-> **Step A — Simplify.** Invoke the `simplify` skill via the Skill tool. Let it complete its full pass.
->
-> **Step B — Review loop (cap 5 rounds).** Each round: spawn three `code-reviewer` subagents in parallel against the current diff via the Agent tool. Dedupe findings; apply every actionable fix to the working tree. Re-run a fresh round on the post-fix diff. Stop when a round returns zero actionable findings.
->
-> **Step C — Thermo loop (cap 5 rounds).** Each round: spawn one `thermo-nuclear-code-quality-review` subagent via the Agent tool. Apply every actionable finding. Re-run. Stop when a round returns zero actionable findings.
->
-> **Cap behaviour.** If a loop hits round 5 with findings still outstanding, stop the pipeline and return `"capped: <loop name>, <N findings remaining>"`. Otherwise return `"clean: review <X> rounds, thermo <Y> rounds"`.
+## 4. Step C — Thermo loop (cap 5 rounds)
+
+Each round: spawn one `thermo-nuclear-code-quality-review` subagent via the Agent tool. Prompt it to return only a compact JSON list of actionable findings. Apply every actionable fix to the working tree. Re-run. Stop when a round returns zero actionable findings. If round 5 completes with findings still outstanding, halt and report `"capped: thermo, <N findings remaining>"`.
+
+## 5. Summary
+
+When both loops finish without hitting their cap, return `"clean: review <X> rounds, thermo <Y> rounds"`.
 
 ## Failure
 
-A subagent error or a hit round-cap halts the pipeline. Surface what the subagent reported, leave the working tree as-is, exit.
+A subagent error or a hit round-cap halts the pipeline. Surface what the subagent reported, leave the working tree as-is, exit. Do not commit, push, or open a PR from this skill.

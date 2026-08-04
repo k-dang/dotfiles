@@ -33,21 +33,33 @@ Write one clear paragraph. This is critical: reviewers challenge whether the wor
 
 ## Step 3, Spawn Reviewers
 
-Launch all four in a single message using the Task tool, each with a different model. All four get the same prompt built from the template in `references/reviewer-prompt.md`.
+Launch all four in one parallel `subagent` call, each using the `reviewer` agent with a different model. All four get the same prompt built from the template in `references/reviewer-prompt.md`.
 
 | Subagent | Model |
 |----------|-------|
-| Reviewer A | `claude-opus-4-8-thinking-xhigh` |
-| Reviewer B | `gpt-5.3-codex-high-fast` |
-| Reviewer C | `gpt-5.5-high-fast` |
-| Reviewer D | `composer-2.5-fast` |
+| Reviewer A | `litellm/bedrock-claude-opus-4-8` |
+| Reviewer B | `litellm/bedrock-claude-opus-5` |
+| Reviewer C | `litellm/bedrock-claude-sonnet-5` |
+| Reviewer D | `litellm/bedrock-mantle-gpt-5-6-sol` |
 
-For each reviewer:
-- `subagent_type`: `generalPurpose`
-- `model`: the model from the table
-- `readonly`: `true`
+Use this shape:
 
-If a model slug in the table above is rejected as unresolvable when you try to spawn the subagent, check the current list of valid slugs in the Task tool's error message, pick the closest equivalent (prefer the highest-reasoning tier of the same family), spawn with the valid slug, and open a separate PR to update this table. Do not block the review on the slug issue.
+```text
+subagent({
+  tasks: [
+    { agent: "reviewer", model: "litellm/bedrock-claude-opus-4-8", task: REVIEW_PROMPT, output: false, progress: false },
+    { agent: "reviewer", model: "litellm/bedrock-claude-opus-5", task: REVIEW_PROMPT, output: false, progress: false },
+    { agent: "reviewer", model: "litellm/bedrock-claude-sonnet-5", task: REVIEW_PROMPT, output: false, progress: false },
+    { agent: "reviewer", model: "litellm/bedrock-mantle-gpt-5-6-sol", task: REVIEW_PROMPT, output: false, progress: false }
+  ],
+  concurrency: 4,
+  context: "fresh"
+})
+```
+
+`REVIEW_PROMPT` must explicitly say: `Review only. Do not edit files.`
+
+If a model slug is rejected as unresolvable, run `pi --list-models`, choose the closest available model from the same family, complete the review, then update this table. Do not block the review on a slug issue.
 
 Read `references/reviewer-prompt.md` and fill in the template with:
 1. The stated intent
