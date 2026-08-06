@@ -97,7 +97,7 @@ Capture this as seed context (file paths, symbols, commits, PR numbers, linked t
 
 ### Discovery
 
-Before spawning investigators, list the available MCPs from the Cursor environment. Use the available-tools map when present. Otherwise inspect the `mcps/` directory Cursor exposes for enabled MCP servers.
+Before spawning investigators, enumerate the MCP servers available in this session. Inspect your own tool list for `mcp__<server>__*` tools. The middle segment is the server name. If MCP tools are deferred (listed by name with no loaded schema), call `ToolSearch` to surface them. As a fallback, run `claude mcp list` via Bash.
 
 Map each available MCP to one evidence category:
 
@@ -113,12 +113,14 @@ Source control is always available through git and `gh`. For the other six, clas
 
 Aim for a complete **coverage map**, not a minimal one. A null result from an issue tracker is evidence the decision was not ticketed, a useful fact in itself. Document the null, don't skip the search.
 
-Launch all matching investigators in a single message so they run concurrently. One investigator per category lets each specialize in one tool's query vocabulary and result shape. Don't ask one agent to cover multiple MCPs.
+Launch all matching investigators as Agent calls in a **single tool block** so they run concurrently. One investigator per category lets each specialize in one tool's query vocabulary and result shape. Don't ask one agent to cover multiple MCPs.
 
 Subagent config (each):
-- `subagent_type`: `generalPurpose`
-- `model`: your configured why-investigators model (default `grok-4.5-fast-xhigh`)
-- `readonly`: `false` (agent mode). **Do not use readonly/Ask mode.** It strips MCP access, which disables MCP-backed investigators entirely. The source control investigator would be safe in readonly, but keep modes uniform. Investigators still shouldn't write anything. That's a posture, not a sandbox.
+- `subagent_type`: `general-purpose`. **Not `Explore`.** Explore is built to skim excerpts for fan-out search, which contradicts the investigator rule to read every PR, ticket, doc, and thread in full.
+- `model`: `sonnet`
+- `run_in_background`: `false`. The default is background execution, which returns a task ID instead of findings. You need every investigator's results in hand before Step 4.
+
+Investigators must not write files, commit, or modify external state. That's a posture set by the prompt, not a sandbox.
 
 Each investigator gets:
 1. The base prompt from `references/investigator-prompt.md`
@@ -126,6 +128,10 @@ Each investigator gets:
 3. The cross-cutting `references/sources/incident-postmortem.md` **if the target code looks defensive** (null checks, retry logic, timeout handling, rate limiting, feature flags, egress guards, OOM handlers)
 4. The code anchor from Step 2 (file paths, symbols, commit hashes, PR numbers, ticket IDs)
 5. The user's original question
+
+Subagents do not inherit this skill's directory, so a relative path like `references/sources/linear.md` is unresolvable to them. **Read each reference file and inline its contents into the subagent prompt.** The same applies to the synthesizer in Step 4.
+
+Each investigator's first action is to load its assigned MCP's tools with `ToolSearch`, since subagents receive MCP schemas deferred too. If the server is unavailable or authentication fails, the investigator reports that as a gap rather than retrying.
 
 ### Investigator roster. One per available evidence category
 
@@ -162,9 +168,11 @@ If your scope assessment suggests a single-commit trivial target where the PR de
 
 Spawn one synthesizer subagent:
 
-- `subagent_type`: `generalPurpose`
-- `model`: your configured why-synthesizer model (default `claude-fable-5-thinking-max`)
-- `readonly`: `false` (agent mode). The synthesizer's quality check spot-verifies citations, which can require MCP access. Readonly/Ask mode strips MCPs and defeats that.
+- `subagent_type`: `general-purpose`
+- `model`: `opus`
+- `run_in_background`: `false`
+
+The synthesizer's quality check spot-verifies citations, so it needs the same MCP access the investigators had. It may read the codebase and call MCP tools; it must not write files, commit, or modify external state.
 
 The synthesizer gets:
 1. The investigator findings, including any null results and any categories skipped with justification

@@ -1,6 +1,6 @@
 # Synthesizer Prompt Template
 
-Build the synthesizer's prompt from this template; fill in the placeholders.
+Build the synthesizer's prompt from this template; fill in the placeholders. Read `epistemics.md` and **paste its contents into the prompt** — the subagent cannot resolve a path relative to this skill directory. To spot-verify citations the synthesizer may need MCP tools, which arrive deferred; it loads them with `ToolSearch`.
 
 ---
 

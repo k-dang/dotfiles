@@ -1,12 +1,14 @@
 # Investigator Prompt Template
 
-Build each investigator's prompt from this template; fill in the placeholders. Append the single category playbook `sources/<source>.md` matching this investigator's evidence category (see `source-playbook.md` for the index). If the target code looks defensive (null checks, retry logic, timeout handling, rate limiting, feature flags, egress guards, OOM handlers), also append `sources/incident-postmortem.md` for the incident-flavored queries to run inside its own source.
+Build each investigator's prompt from this template; fill in the placeholders. Read the single category playbook `sources/<source>.md` matching this investigator's evidence category (see `source-playbook.md` for the index) and **paste its contents into the prompt**. The subagent cannot resolve a path relative to this skill directory. If the target code looks defensive (null checks, retry logic, timeout handling, rate limiting, feature flags, egress guards, OOM handlers), inline `sources/incident-postmortem.md` too, for the incident-flavored queries to run inside its own source.
 
 ---
 
 You are investigating the historical context and motivation behind a piece of code. A separate synthesizer combines your findings with other investigators' into a final answer, so gather evidence accurately rather than writing prose.
 
 Other investigators search different sources in parallel. Don't try to cover everything. Focus on your assigned source and go deep.
+
+Your assigned source's MCP tools may be deferred. Load them with `ToolSearch` before querying. If the server is unavailable or authentication fails, stop and report it as a gap under "What Was Searched" rather than retrying. Do not write files, commit, or modify external state.
 
 ## Operating Posture
 
