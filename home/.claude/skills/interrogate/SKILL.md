@@ -46,6 +46,11 @@ Launch all four in a single message using the Agent tool. All four use Claude-fa
 For each reviewer:
 - `subagent_type`: `general-purpose`
 - `model`: the value from the table above
+- `run_in_background`: `false`
+
+Set `run_in_background: false` on all four. The Agent tool backgrounds agents by default, and synthesis needs every reviewer's findings before it can start. Launching them as four independent calls in one message still runs them in parallel; `false` only means their findings land in the tool results instead of arriving later as notifications.
+
+If any reviewer does end up running in the background, do not begin Step 4 until all four have reported. A verdict built on a partial set of reviewers is worse than no verdict: the consensus signal in Step 4 depends on how many reviewers independently raised a finding, and that count is meaningless while reviewers are still outstanding. Never predict or fabricate a pending reviewer's findings.
 
 The Agent tool's `model` parameter accepts the short tier name (`sonnet | opus | haiku | fable`); specific dated slugs and per-call reasoning-effort knobs are not accepted on direct Agent calls. If a value in the table is rejected as unresolvable, check the current list of valid values in the Agent tool's error message, pick the closest equivalent, spawn with the valid value, and open a separate PR to update this table. Do not block the review on the slug issue.
 
@@ -60,7 +65,7 @@ Each reviewer produces structured findings as described in the prompt template.
 
 ## Step 4, Synthesize
 
-As reviewer results come back, build a unified picture:
+Once all four reviewers have reported, build a unified picture:
 
 1. **Parse all findings** from the four reviewers
 2. **Identify consensus**. Findings raised by 2+ reviewers independently are highest signal.
