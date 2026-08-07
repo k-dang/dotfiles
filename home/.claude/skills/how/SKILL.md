@@ -46,7 +46,7 @@ Spawn all explorers in a single message (one Agent call per explorer, all in the
 
 - `subagent_type`: `general-purpose`
 - `model`: `sonnet`
-- Tell each explorer explicitly that this is read-only work: no edits, no writes, no mutating commands
+- `run_in_background`: `false` — you need their findings before Step 3
 
 Each explorer gets the same base prompt from `references/explorer-prompt.md` plus a specific exploration angle naming its slice. Each explorer should:
 - Start broad: Glob for relevant directories, Grep for key types/interfaces/class names
@@ -65,7 +65,7 @@ Spawn a single subagent that explores and explains in one pass:
 
 - `subagent_type`: `general-purpose`
 - `model`: `fable`
-- Tell it this is read-only work
+- `run_in_background`: `false` — you need its output before Step 4
 
 The agent does its own exploration (Glob, Grep, Read) and writes the explanation directly. Read `references/explainer-prompt.md` for the communication style and output format. Same structure, just no explorer findings as input.
 
@@ -77,7 +77,7 @@ Once all explorers return, spawn a single subagent to synthesize their findings 
 
 - `subagent_type`: `general-purpose`
 - `model`: `fable`
-- Tell it this is read-only work
+- `run_in_background`: `false` — you need its output before Step 4
 
 The explainer gets all explorers' findings and writes the human-facing explanation (output format below). Read `references/explainer-prompt.md` for the full prompt template. The explainer reconciles overlapping findings, resolves contradictions, and weaves the slices into a unified picture.
 
@@ -119,7 +119,9 @@ After the explanation is complete, spawn one architectural critic per row below,
 
 Critic C is a thin wrapper: spawn a `general-purpose` agent with `model: sonnet` and `name: gpt-5-5-critic`, whose prompt tells it to write a self-contained critique prompt, run it with `codex exec -s read-only` (pass an explicit Bash timeout; codex runs can exceed the 10-minute default), and return the report verbatim.
 
-These are minimum reasoning levels. Escalate any critic to a stronger model when the architecture warrants deeper analysis. Tell every critic this is read-only work.
+Every critic gets `run_in_background: false` — you need all findings before Step 3.
+
+Escalate any critic to a stronger model when the architecture warrants deeper analysis.
 
 Read `references/critic-prompt.md` for the prompt template. Each critic gets:
 1. The explanation from Step 1 (so they don't re-explore)

@@ -20,6 +20,8 @@ You are reviewing the architecture of a codebase subsystem. An explanation of ho
 
 ## Instructions
 
+**This is read-only work.** Do not edit or create files, and do not run mutating commands. You have the tools to write; you must not use them. Report problems, don't fix them.
+
 Read the files listed above. Use the explanation as a map, but form your own opinions from the code itself. The explanation might miss things or frame them charitably.
 
 Find architectural problems, not line-level bugs or style issues. Ask whether this subsystem is built well for what it needs to do and how it will need to evolve.
