@@ -31,35 +31,45 @@ iwr -useb https://raw.githubusercontent.com/k-dang/dotfiles/main/install.ps1 | i
 ```
 
 Or clone and run manually
-```
+```powershell
 git clone https://github.com/k-dang/dotfiles.git $HOME\dotfiles
 $HOME\dotfiles\install.ps1
+```
+
+`install.ps1` clones the repo, installs tools, and points `$PROFILE` at `shell/powershell.ps1`. It does not copy `home/` into place, so run a sync afterward to get the managed directories (`.claude`, `.agents`, `.config`, etc.) onto disk:
+
+```powershell
+$HOME\dotfiles\dot.ps1 sync
 ```
 
 ## Project Structure
 
 ```
 dotfiles/
-├── dot                      # CLI for dotfiles management
-├── install.sh              # Unix one-liner bootstrap
-├── install.ps1              # Windows one-liner bootstrap
-├── shell/                  # Main shell configurations
-│   ├── zsh.sh              # zsh config
-│   └── powershell.ps1      # PowerShell config
-├── modules/                # Modular configurations
-│   ├── aliases.sh           # Unix aliases and functions
-│   ├── aliases.ps1         # PowerShell aliases and functions
-│   ├── local.sh             # Unix local config (not tracked)
-│   ├── local.ps1           # PowerShell local config (not tracked)
-│   ├── local.example.sh     # Unix local config template (tracked)
-│   ├── local.example.ps1   # PowerShell local config template (tracked)
-│   ├── tools.sh            # Unix tool installation
-│   └── tools.ps1           # PowerShell tool installation
-├── bin/                    # Utility scripts
-│   ├── verify-setup.sh     # Verify Unix setup
-│   ├── verify-setup.ps1    # Verify Windows setup
-│   ├── update.sh           # Update Unix tools
-│   └── update.ps1          # Update Windows tools
+├── dot                      # CLI for dotfiles management (macOS/Linux)
+├── dot.ps1                  # CLI for dotfiles management (Windows)
+├── install.sh               # Unix one-liner bootstrap
+├── install.ps1               # Windows one-liner bootstrap
+├── shell/                   # Main shell configurations
+│   ├── zsh.sh                # zsh config
+│   └── powershell.ps1        # PowerShell config
+├── modules/                 # Modular configurations
+│   ├── aliases.sh            # Unix aliases and functions
+│   ├── aliases.ps1           # PowerShell aliases and functions
+│   ├── local.sh               # Unix local config (not tracked)
+│   ├── local.ps1              # PowerShell local config (not tracked)
+│   ├── local.example.sh       # Unix local config template (tracked)
+│   ├── local.example.ps1      # PowerShell local config template (tracked)
+│   ├── tools.sh               # Unix tool installation
+│   └── tools.ps1              # PowerShell tool installation
+├── config/
+│   └── oh-my-posh/           # Prompt theme config
+├── home/                    # Files synced/stowed into $HOME
+│   ├── .config/               # Stowed into ~/.config on macOS/Linux (git, opencode, ...)
+│   ├── .agents/               # Copied to $HOME\.agents on Windows (skills)
+│   ├── .claude/                # Copied to $HOME\.claude on Windows (skills, agents, hooks)
+│   ├── .cursor/                 # Copied to $HOME\.cursor on Windows (agents, commands, skills)
+│   └── .pi/                     # Copied to $HOME\.pi on Windows (agent extensions)
 └── README.md
 ```
 
@@ -70,52 +80,61 @@ dotfiles/
 - **Modular structure**: Easy to add new aliases, paths, and tools
 - **Cross-platform**: Same structure works on macOS, Linux, and Windows
 - **Safe initialization**: Initial setup adds managed symlinks without adopting existing config files
-- **Tool installation**: Auto-installs tools like `gum`, `bat`, `fzf`, `lazygit`, `zoxide`, `oh-my-posh` during setup
+- **Tool installation**: Auto-installs `gum`, `bat`, `fzf`, `lazygit`, `oh-my-posh`, `zoxide`, `mise`, and `eza` during setup
 
 ## Dot CLI
 
-The `dot` command is a full CLI alternative to `install.sh` with subcommands and flags.
+Dotfiles management ships as two CLIs with different responsibilities per platform: `dot` (bash) on macOS/Linux, `dot.ps1` (PowerShell) on Windows.
 
-### Recommended workflow
+### macOS / Linux: `dot`
 
-Use the CLI in two phases:
+```bash
+dot init                 # Install tools, non-destructive initial stow, configure shell, chmod bin/ scripts
+dot doctor               # Check dependencies and configuration
+dot stow                 # Restow ~/.config symlinks after editing files under home/
+dot help                 # Show help
+```
 
-1. Bootstrap the machine with `dot init`
-2. Use `dot doctor` to verify dependencies and shell wiring
-3. Use `dot stow` when you changed files under `home/` and want to restow them
-4. On Windows, use `pwsh .\dot.ps1 sync` when you want to copy managed top-level directories from `home/` into `$HOME`
-
-`dot init` is the first-run command. It installs tools, performs a non-destructive initial stow, configures your shell, and makes scripts in `bin/` executable.
+`dot init` is the first-run command. It installs tools, performs a non-destructive initial stow (using GNU Stow), configures `~/.zshrc`, and makes scripts in `bin/` executable.
 
 `dot stow` is the safe repeat command. It uses `stow --restow` so rerunning it reconciles managed symlinks already managed by stow.
 
 If `dot init` finds an existing real file that conflicts with a managed path under `home/`, it fails fast and leaves that file untouched.
 
-### Commands
+Options: `--dotfiles-dir PATH`, `--version`, `-h`/`--help`.
 
-```bash
-dot init                 # Full setup (tools, stow, shell config)
-dot doctor               # Check dependencies and configuration
-dot stow                 # Recreate symlinks for ~/.config
-dot help                 # Show help
+### Windows: `dot.ps1`
+
+```powershell
+dot.ps1 sync              # Copy each top-level directory under home/ into $HOME
+dot.ps1 doctor            # Check that each home/ directory has been synced to $HOME
+dot.ps1 orphans           # List target paths under $HOME that no longer exist in home/
+dot.ps1 help              # Show help
 ```
 
-### Options
+Windows has no `stow` equivalent, so `dot.ps1 sync` copies rather than symlinks: it scans every top-level directory under `home/` (currently `.agents`, `.claude`, `.config`, `.cursor`, `.pi`) and copies it to the matching path under `$HOME`, e.g. `home/.claude` -> `$HOME\.claude`.
 
-```bash
---dotfiles-dir PATH      # Override dotfiles directory
---version                # Show version
--h, --help               # Show help
-```
+`dot.ps1 orphans` prints a tree per managed directory of target paths with no matching source under `home/`. It reports the topmost unmatched path only - an orphaned directory is listed once rather than expanded into its whole subtree. It does not delete anything or compare file contents.
+
+Options: `--dotfiles-dir PATH`, `--dry-run` (sync only, preview without copying), `--version`, `-h`/`--help`.
 
 ### Typical usage
 
-#### First-time setup
+#### First-time setup (macOS)
 
 ```bash
 git clone https://github.com/k-dang/dotfiles.git ~/dotfiles
 ~/dotfiles/dot init
 source ~/.zshrc
+```
+
+#### First-time setup (Windows)
+
+```powershell
+git clone https://github.com/k-dang/dotfiles.git $HOME\dotfiles
+$HOME\dotfiles\install.ps1
+$HOME\dotfiles\dot.ps1 sync
+. $PROFILE
 ```
 
 #### Verify your setup
@@ -124,37 +143,23 @@ source ~/.zshrc
 ~/dotfiles/dot doctor
 ```
 
-#### Restow after editing managed config files
+```powershell
+$HOME\dotfiles\dot.ps1 doctor
+```
+
+#### Restow after editing managed config files (macOS)
 
 ```bash
 ~/dotfiles/dot stow
 ```
 
-#### Windows sync for copied home directories
+#### Resync after editing managed config files (Windows)
 
 ```powershell
 $HOME\dotfiles\dot.ps1 sync
 ```
 
-`dot.ps1 sync` copies each top-level directory under `home/` into the matching path under `$HOME`.
-
-Examples:
-
-- `home/.config/*` -> `$HOME/.config/`
-- `home/.agents/*` -> `$HOME/.agents/`
-- `home/.claude/*` -> `$HOME/.claude/`
-
-To preview paths in those target directories that no longer exist in `home/`, run:
-
-```powershell
-$HOME\dotfiles\dot.ps1 orphans
-```
-
-`orphans` prints a tree per managed directory. It reports the topmost unmatched path only — an
-orphaned directory is listed once rather than expanded into its whole subtree. It does not delete
-anything or compare file contents.
-
-You can run `~/dotfiles/dot help` at any time to see the current command list.
+You can run `~/dotfiles/dot help` or `$HOME\dotfiles\dot.ps1 help` at any time to see the current command list.
 
 ## Verification
 
@@ -165,10 +170,10 @@ You can run `~/dotfiles/dot help` at any time to see the current command list.
 source ~/.zshrc
 
 # Verify setup
-~/dotfiles/bin/verify-setup.sh
+~/dotfiles/dot doctor
 
 # Test an alias
-gst
+ga some-branch
 ```
 
 ### Windows
@@ -178,13 +183,10 @@ gst
 . $PROFILE
 
 # Verify setup
-$HOME\dotfiles\bin\verify-setup.ps1
+$HOME\dotfiles\dot.ps1 doctor
 
 # Test an alias
-gs
-
-# Run the dot.ps1 regression tests
-& $HOME\dotfiles\tests\dot.test.ps1
+ga some-branch
 ```
 
 ## Adding New Aliases
@@ -288,19 +290,21 @@ The file will be automatically sourced if it exists.
 
 ## Updating Tools
 
-If you want to reinstall or update tools (like `gum`):
+Rerun tool installation to pick up new or updated tools:
 
 ### macOS
 
 ```bash
-~/dotfiles/bin/update.sh
+source ~/dotfiles/modules/tools.sh
 ```
 
 ### Windows
 
 ```powershell
-$HOME\dotfiles\bin\update.ps1
+. $HOME\dotfiles\modules\tools.ps1
 ```
+
+Each installer function is idempotent - it skips a tool that's already installed.
 
 ## Backup and Restore
 
@@ -310,21 +314,27 @@ $HOME\dotfiles\bin\update.ps1
 
 ### Windows
 
-`dot init` updates `$PROFILE` in place and does not create automatic backups.
+`install.ps1` updates `$PROFILE` in place and does not create automatic backups.
 
 ## Available Aliases
 
 ### macOS
 
-- `gst` - Show git status
-- `ga <branch>` - Create new worktree + branch and step into it
-- `gd` - Remove current worktree and its branch
+- `cc` - `claude`
+- `ccy` - `claude --dangerously-skip-permissions`
+- `cca` - `claude --enable-auto-mode`
+- `ls`, `ll`, `la`, `lt` - `eza` in place of `ls` (list, long, all, tree), if `eza` is installed
+- `ga <branch>` - Create new worktree + branch, `mise trust` it, and step into it
+- `gd` - Remove current worktree and its branch (prompts via `gum confirm`)
 
 ### Windows
 
-- `gs` - Show git status
+- `cc` - `claude`
+- `ccy` - `claude --dangerously-skip-permissions`
+- `cca` - `claude --enable-auto-mode`
+- `ll`, `lt` - `eza` in place of `ls` (long, tree), if `eza` is installed
 - `ga <branch>` - Create new worktree + branch and step into it
-- `gd` - Remove current worktree and its branch
+- `gd` - Remove current worktree and its branch (prompts via `gum confirm`, falls back to a plain y/n prompt if `gum` isn't installed)
 
 ## Uninstall
 
@@ -355,7 +365,9 @@ Preference is to use [Nerd Fonts](https://www.nerdfonts.com/) to cover icons and
 
 ## GNU stow
 
-The CLI already wraps the recommended stow behavior:
+macOS/Linux only - Windows uses `dot.ps1 sync` (copy) instead, since GNU Stow's symlinks don't apply there.
+
+The `dot` CLI already wraps the recommended stow behavior:
 
 - `dot init` performs a non-destructive first-time stow
 - `dot stow` performs repeatable restows

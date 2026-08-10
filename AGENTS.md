@@ -2,13 +2,6 @@
 
 Cross-platform dotfiles repository supporting macOS (zsh) and Windows (PowerShell). Always installs to `~/dotfiles` (Unix) or `$HOME\dotfiles` (Windows).
 
-## Structure
-
-- `install.sh` / `install.ps1` - Platform installers
-- `shell/` - Entry-point shell config scripts
-- `modules/` - Reusable shell modules and aliases
-- `home/` - Files intended for the home directory (for example `~/.config` via stow and top-level directories copied into `~` via `dot.ps1 sync`)
-
 ## Architecture
 
 Shell config entry points (`shell/zsh.sh` and `shell/powershell.ps1`) source modules then initialize tools (oh-my-posh, zoxide, mise).
@@ -21,20 +14,10 @@ Shell config entry points (`shell/zsh.sh` and `shell/powershell.ps1`) source mod
 - **Managed home directories**: Top-level directories under `home/` are copied by `dot.ps1 sync`
   - Example: `~/.agents/skills/...` → `~/dotfiles/home/.agents/skills/...`
 
-Key modules:
-
-- `modules/aliases.{sh,ps1}` - Git worktree aliases (`ga`, `gd`, `gst`/`gs`)
-- `modules/local.{sh,ps1}` - Machine-specific config (gitignored)
-
 ## Where to look
 
-- `shell/zsh.sh` - macOS entry-point shell config
-- `shell/powershell.ps1` - Windows entry-point shell config
-- `modules/aliases.{sh,ps1}` - Common shell aliases and git helpers
-- `modules/local.example.{sh,ps1}` - Template for machine-specific config
-- `home/.config/` - Stowed app configs (e.g., git)
-- `home/.agents/` - Agent configuration copied into `~/.agents`
-- `home/.claude/` - Claude configuration copied into `~/.claude`
+- `shell/` - Entry-point shell configs (`zsh.sh` macOS, `powershell.ps1` Windows)
+- `home/` - App and agent configs, one subdirectory per tool, synced into `~`
 
 ## Conventions
 
