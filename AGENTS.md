@@ -40,21 +40,10 @@ Key modules:
 
 - Machine-specific settings go in `modules/local.sh` or `modules/local.ps1` (gitignored). Copy from `modules/local.example.{sh,ps1}` as a starting point.
 - Stow layout: `home/` mirrors `~`, stow creates symlinks
+- `home/.agents/skills/*/agents/openai.yaml` files are kept even when the matching skill is trimmed from `home/.claude/skills/` - don't delete them when mirroring `.claude` skill cleanup into `.agents`
 
 ## Anti-patterns
 
 - Edit `~/.config/*` directly (changes lost on stow)
 - Hardcode paths (use `$DOTFILES_DIR`, `$HOME`)
 - Nested git repos in stowed dirs (creates symlink issues)
-
-## Commands
-
-```bash
-dot init                 # Full setup (tools, stow, shell config)
-dot update               # Pull latest changes and restow configs
-dot doctor               # Check dependencies and configuration
-dot stow                 # Recreate symlinks for ~/.config
-dot link                 # Install dot into PATH (symlink)
-dot unlink               # Remove the symlink
-dot help                 # Show help
-```

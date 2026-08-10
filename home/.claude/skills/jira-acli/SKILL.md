@@ -1,9 +1,6 @@
 ---
 name: jira-acli
-description:
-  Use when working with Jira tickets via CLI. Covers viewing, searching,
-  creating, editing, transitioning, and commenting on work items. Also handles
-  sprints, boards, and assignments using the Atlassian CLI (acli).
+description: Use when working with Jira tickets via CLI. Covers viewing, searching, creating, editing, transitioning, and commenting on work items. Also handles sprints, boards, and assignments using the Atlassian CLI (acli).
 ---
 
 # Jira CLI (acli) Skill
