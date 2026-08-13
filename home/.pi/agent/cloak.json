@@ -1,0 +1,35 @@
+{
+  "enabled": true,
+  "cloakCharacter": "*",
+  "cloakLength": null,
+  "tryAllPatterns": true,
+  "patterns": [
+    {
+      "filePattern": [
+        "**/*.log",
+        "*.log",
+        "**/.env",
+        "**/.env.*",
+        "**/*.env",
+        "**/.envrc"
+      ],
+      "cloakPattern": [
+        {
+          "pattern": "(Bearer\\s+)[A-Za-z0-9._~+/=-]+",
+          "replace": "$1",
+          "flags": "i"
+        },
+        {
+          "pattern": "((?:api[_-]?key|access[_-]?key(?:[_-]?id)?|access[_-]?token|refresh[_-]?token|auth(?:orization)?|client[_-]?secret|secret(?:[_-]?key)?|session[_-]?token|password|passwd|pwd)\\s*[\\\"']?\\s*(?:=>|=|:)\\s*[\\\"']?)[^\\s,\\\"'}\\]]+",
+          "replace": "$1",
+          "flags": "i"
+        },
+        {
+          "pattern": "([a-z][a-z0-9+.-]*:\\/\\/[^:\\s/]+:)[^@\\s/]+(?=@)",
+          "replace": "$1",
+          "flags": "i"
+        }
+      ]
+    }
+  ]
+}
