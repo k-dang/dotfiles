@@ -39,7 +39,7 @@ Launch all four in one parallel `subagent` call, each using the `reviewer` agent
 |----------|-------|
 | Reviewer A | `litellm/bedrock-claude-opus-4-8` |
 | Reviewer B | `litellm/bedrock-claude-opus-5` |
-| Reviewer C | `litellm/bedrock-claude-sonnet-5` |
+| Reviewer C | `litellm/qwen3.8-27b-fp8` |
 | Reviewer D | `litellm/bedrock-mantle-gpt-5-6-sol` |
 
 Use this shape:
@@ -49,7 +49,7 @@ subagent({
   tasks: [
     { agent: "reviewer", model: "litellm/bedrock-claude-opus-4-8", task: REVIEW_PROMPT, output: false, progress: false },
     { agent: "reviewer", model: "litellm/bedrock-claude-opus-5", task: REVIEW_PROMPT, output: false, progress: false },
-    { agent: "reviewer", model: "litellm/bedrock-claude-sonnet-5", task: REVIEW_PROMPT, output: false, progress: false },
+    { agent: "reviewer", model: "litellm/qwen3.8-27b-fp8", task: REVIEW_PROMPT, output: false, progress: false },
     { agent: "reviewer", model: "litellm/bedrock-mantle-gpt-5-6-sol", task: REVIEW_PROMPT, output: false, progress: false }
   ],
   concurrency: 4,
