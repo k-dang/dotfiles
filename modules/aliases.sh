@@ -1,4 +1,5 @@
 # Misc aliases
+alias ghss='gh stack sync --remote origin'
 alias cc='claude'
 alias ccy='claude --dangerously-skip-permissions'
 alias cca='claude --permission-mode auto'
