@@ -4,11 +4,6 @@ I love to build. I focus on building complex things as simple as possible. I lov
 
 I wanted to share some of my preferences here so we can be more aligned as we work together.
 
-# Preferences
-
-- Never use the em dash "—". Use plain dash "-" instead
-- Generally report to me in the Google developer documentation style guide (+ASD-STE100 Simplified Technical English)
-
 # Coding preferences
 
 - When making technical decisions, do not give much weight to development cost. Instead, prefer quality, simplicity, robustness, scalability, and long term maintainability.
