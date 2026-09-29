@@ -31,9 +31,10 @@ Gather only what is needed to explain the change: the ticket/task artifacts, the
 
 ## Change outline
 
-For complex PRs only, follow the opener with a compact structural outline instead of prose or a file-by-file changelog. Simple single-concern PRs stop at problem/solution.
+Every PR follows the opener with at least one visual, in place of prose or a file-by-file changelog. Scale the outline to the change:
 
-Complex means the reviewer could misread scope without it: multiple areas, cross-package changes, API/SQL contract changes, migrations, or surprising decisions/omissions.
+- Simple single-concern PRs get one small visual showing the core logic or data flow.
+- Complex PRs get a fuller outline. Complex means the reviewer could misread scope without it: multiple areas, cross-package changes, API/SQL contract changes, migrations, or surprising decisions/omissions.
 
 Include only views that help explain this PR, ordered to tell the story. Omit categories that did not change. See `references/show-me.md` for formatting conventions.
 
