@@ -58,8 +58,8 @@ if (Test-Path "$env:DOTFILES_PATH\modules\local.ps1")
 # Editor preference (uncomment and set your preferred editor)
 $env:EDITOR = "edit"
 
-# Initialize oh-my-posh theme
-if (Get-Command oh-my-posh -ErrorAction SilentlyContinue)
+# Initialize oh-my-posh theme (PS7+ only; breaks 5.1 irm|iex installers like Codex)
+if (($PSVersionTable.PSVersion.Major -ge 7) -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue))
 {
     Invoke-GeneratedInitScript -Name "oh-my-posh" -Generator {
         oh-my-posh init pwsh --config "$env:DOTFILES_PATH\config\oh-my-posh\config.omp.json"
