@@ -18,6 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Defaults (can be overridden by flags)
 DOTFILES_DIR="$SCRIPT_DIR"
+SKILL_DIRS=(".claude/skills" ".agents/skills")
 
 print_header() {
     printf "\n${BOLD}${BLUE}==>${RESET} ${BOLD}%s${RESET}\n" "$1"
@@ -379,6 +380,78 @@ cmd_skills_add() {
     rm -rf "$tmpdir"
 }
 
+# A skill is stale when it is installed under $HOME but missing from home/. Without
+# a source directory there is nothing to compare against, so nothing is stale.
+is_stale_skill() {
+    local source="${DOTFILES_DIR}/home/$1"
+    [[ -d "$source" && -e "${HOME}/$1/$2" && ! -e "${source}/$2" ]]
+}
+
+# Prints one line per stale skill: the name padded to a column, then the
+# top-level directories (.claude, .agents) it is installed in.
+list_stale_skills() {
+    local rel dir name
+    for rel in "${SKILL_DIRS[@]}"; do
+        # The glob skips dot-prefixed folders such as .trash, which are not skills.
+        for dir in "${HOME}/${rel}"/*/; do
+            name="$(basename "$dir")"
+            if is_stale_skill "$rel" "$name"; then
+                printf "%s\t%s\n" "$name" "${rel%%/*}"
+            fi
+        done
+    done | sort | awk -F'\t' '
+        !($1 in locations) { names[n++] = $1; locations[$1] = $2; if (length($1) > width) width = length($1); next }
+        { locations[$1] = locations[$1] " " $2 }
+        END { for (i = 0; i < n; i++) printf "%-" width "s  %s\n", names[i], locations[names[i]] }
+    '
+}
+
+cmd_prune() {
+    local dry_run=false
+    case "${1:-}" in
+        "") ;;
+        --dry-run) dry_run=true ;;
+        *) die "Unexpected argument for prune: $1" ;;
+    esac
+
+    print_header "Finding skills not in home/"
+
+    local stale
+    stale="$(list_stale_skills)"
+    if [[ -z "$stale" ]]; then
+        print_success "No stale skills found"
+        return 0
+    fi
+
+    if $dry_run; then
+        printf "%s\n" "$stale" | sed 's/^/  /'
+        print_info "No files were deleted"
+        return 0
+    fi
+
+    command_exists gum || die "gum not found. Install it with: brew install gum"
+
+    local chosen
+    chosen="$(printf "%s\n" "$stale" | gum choose --no-limit --header "Select skills to delete")" || true
+    if [[ -z "$chosen" ]]; then
+        print_info "No skills deleted"
+        return 0
+    fi
+
+    local count=0 label name rel
+    while IFS= read -r label; do
+        name="${label%% *}"
+        for rel in "${SKILL_DIRS[@]}"; do
+            if is_stale_skill "$rel" "$name"; then
+                rm -rf "${HOME:?}/${rel}/${name}"
+            fi
+        done
+        ((++count))
+    done <<<"$chosen"
+
+    print_success "Deleted ${count} skill(s)"
+}
+
 cmd_help() {
     printf "${BOLD}%s${RESET} - Dotfiles management tool\n" "$SCRIPT_NAME"
     printf "Version: %s\n\n" "$VERSION"
@@ -391,6 +464,7 @@ cmd_help() {
     printf "    doctor              Run diagnostics and check installation\n"
     printf "    stow                Create symlinks for dotfiles using GNU Stow\n"
     printf "    skills add <url>    Download skills from a GitHub tree URL into home/.agents/skills and home/.claude/skills\n"
+    printf "    prune [--dry-run]   Pick installed skills that are not in home/ to delete\n"
     printf "    help                Show this help message (default)\n\n"
 
     printf "${BOLD}OPTIONS:${RESET}\n"
@@ -447,6 +521,9 @@ main() {
                 exit 1
             fi
             cmd_skills_add "$@"
+            ;;
+        prune)
+            cmd_prune "$@"
             ;;
         help)
             cmd_help

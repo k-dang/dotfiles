@@ -92,6 +92,7 @@ Dotfiles management ships as two CLIs with different responsibilities per platfo
 dot init                 # Install tools, non-destructive initial stow, configure shell, chmod bin/ scripts
 dot doctor               # Check dependencies and configuration
 dot stow                 # Restow ~/.config symlinks after editing files under home/
+dot prune                # Pick installed skills that no longer exist in home/ and delete them
 dot help                 # Show help
 ```
 
@@ -101,6 +102,8 @@ dot help                 # Show help
 
 If `dot init` finds an existing real file that conflicts with a managed path under `home/`, it fails fast and leaves that file untouched.
 
+`dot prune` works like `dot.ps1 prune` (see below) but uses `gum choose` for the selection. Stow does not remove symlinks for files deleted from `home/`, so removed skills linger as folders of dangling links until pruned. `--dry-run` lists them without deleting.
+
 Options: `--dotfiles-dir PATH`, `--version`, `-h`/`--help`.
 
 ### Windows: `dot.ps1`
@@ -109,6 +112,7 @@ Options: `--dotfiles-dir PATH`, `--version`, `-h`/`--help`.
 dot.ps1 sync              # Copy each top-level directory under home/ into $HOME
 dot.ps1 doctor            # Check that each home/ directory has been synced to $HOME
 dot.ps1 orphans           # List target paths under $HOME that no longer exist in home/
+dot.ps1 prune             # Pick installed skills that no longer exist in home/ and delete them
 dot.ps1 help              # Show help
 ```
 
@@ -116,7 +120,9 @@ Windows has no `stow` equivalent, so `dot.ps1 sync` copies rather than symlinks:
 
 `dot.ps1 orphans` prints a tree per managed directory of target paths with no matching source under `home/`. It reports the topmost unmatched path only - an orphaned directory is listed once rather than expanded into its whole subtree. It does not delete anything or compare file contents.
 
-Options: `--dotfiles-dir PATH`, `--dry-run` (sync only, preview without copying), `--version`, `-h`/`--help`.
+`dot.ps1 prune` compares `~/.claude/skills` and `~/.agents/skills` with their `home/` counterparts and opens a checkbox list of skill folders that are installed but no longer managed (arrow keys move, space toggles, `a` toggles all, enter deletes, esc cancels). A skill in both folders is one entry and is deleted from both. `sync` itself never deletes.
+
+Options: `--dotfiles-dir PATH`, `--dry-run` (sync and prune; preview without changing files), `--version`, `-h`/`--help`.
 
 ### Typical usage
 

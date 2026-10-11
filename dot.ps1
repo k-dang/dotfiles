@@ -8,6 +8,7 @@ $VERSION = "0.1.0"
 
 $DOTFILES_DIR = $PSScriptRoot
 $SYNC_PAIRS = @()
+$SKILL_DIRS = @(".claude/skills", ".agents/skills")
 
 function Write-Header {
     param([Parameter(Mandatory)][string]$Message)
@@ -321,6 +322,161 @@ function Invoke-Orphans {
         Write-Warn "$orphanCount orphaned path(s) in $orphanedLabels managed $directoryWord; no files were deleted"
     }
 
+    return 0
+}
+
+function Get-StaleSkills {
+    $stale = @{}
+
+    foreach ($relativePath in $SKILL_DIRS) {
+        $source = Join-Path $DOTFILES_DIR "home/$relativePath"
+        $target = Join-Path $HOME $relativePath
+
+        # Without a source there is nothing to compare against, and treating every
+        # installed skill as stale would offer to delete all of them.
+        if (-not (Test-Path -LiteralPath $source -PathType Container) -or
+            -not (Test-Path -LiteralPath $target -PathType Container)) {
+            continue
+        }
+
+        $managed = @(Get-ChildItem -LiteralPath $source -Directory -Force | ForEach-Object Name)
+
+        foreach ($dir in Get-ChildItem -LiteralPath $target -Directory -Force) {
+            # Dot-prefixed folders such as .trash are tool bookkeeping, not skills.
+            if ($dir.Name.StartsWith(".") -or $dir.Name -in $managed) {
+                continue
+            }
+
+            if (-not $stale.ContainsKey($dir.Name)) {
+                $stale[$dir.Name] = [pscustomobject]@{
+                    Name = $dir.Name
+                    Locations = New-Object System.Collections.Generic.List[string]
+                    Paths = New-Object System.Collections.Generic.List[string]
+                }
+            }
+
+            $stale[$dir.Name].Locations.Add($relativePath.Split('/')[0])
+            $stale[$dir.Name].Paths.Add($dir.FullName)
+        }
+    }
+
+    $stale.Values | Sort-Object -Property Name
+}
+
+function Write-SelectionList {
+    param(
+        [Parameter(Mandatory)][string[]]$Labels,
+        [Parameter(Mandatory)][bool[]]$Selected,
+        [Parameter(Mandatory)][int]$Cursor
+    )
+
+    $esc = [char]27
+
+    for ($i = 0; $i -lt $Labels.Count; $i++) {
+        $pointer = if ($i -eq $Cursor) { ">" } else { " " }
+        $mark = if ($Selected[$i]) { "[x]" } else { "[ ]" }
+        $color = if ($i -eq $Cursor) { "Cyan" } elseif ($Selected[$i]) { "Yellow" } else { "Gray" }
+        Write-Host "$esc[2K$pointer $mark $($Labels[$i])" -ForegroundColor $color
+    }
+
+    Write-Host "$esc[2K  up/down move, space toggle, a all, enter delete, esc cancel" -ForegroundColor DarkGray
+}
+
+function Select-Items {
+    param([Parameter(Mandatory)][string[]]$Labels)
+
+    $esc = [char]27
+    $selected = New-Object bool[] $Labels.Count
+    $cursor = 0
+    $confirmed = $false
+
+    Write-Host "$esc[?25l" -NoNewline
+    try {
+        Write-SelectionList -Labels $Labels -Selected $selected -Cursor $cursor
+
+        while ($true) {
+            $key = [Console]::ReadKey($true).Key
+
+            if ($key -in [ConsoleKey]::UpArrow, [ConsoleKey]::K) {
+                $cursor = ($cursor - 1 + $Labels.Count) % $Labels.Count
+            }
+            elseif ($key -in [ConsoleKey]::DownArrow, [ConsoleKey]::J) {
+                $cursor = ($cursor + 1) % $Labels.Count
+            }
+            elseif ($key -eq [ConsoleKey]::Spacebar) {
+                $selected[$cursor] = -not $selected[$cursor]
+            }
+            elseif ($key -eq [ConsoleKey]::A) {
+                $selectAll = $selected -contains $false
+                for ($i = 0; $i -lt $selected.Count; $i++) {
+                    $selected[$i] = $selectAll
+                }
+            }
+            elseif ($key -eq [ConsoleKey]::Enter) {
+                $confirmed = $true
+                break
+            }
+            elseif ($key -in [ConsoleKey]::Escape, [ConsoleKey]::Q) {
+                break
+            }
+            else {
+                continue
+            }
+
+            Write-Host "$esc[$($Labels.Count + 1)A" -NoNewline
+            Write-SelectionList -Labels $Labels -Selected $selected -Cursor $cursor
+        }
+    }
+    finally {
+        Write-Host "$esc[?25h" -NoNewline
+    }
+
+    if ($confirmed) {
+        for ($i = 0; $i -lt $selected.Count; $i++) {
+            if ($selected[$i]) {
+                $i
+            }
+        }
+    }
+}
+
+function Invoke-Prune {
+    param([switch]$DryRun)
+
+    Write-Header "Finding skills not in home/"
+
+    if (-not (Test-ManagedPaths)) {
+        return 1
+    }
+
+    $stale = @(Get-StaleSkills)
+    if ($stale.Count -eq 0) {
+        Write-Success "No stale skills found"
+        return 0
+    }
+
+    $width = ($stale | ForEach-Object { $_.Name.Length } | Measure-Object -Maximum).Maximum
+    $labels = @($stale | ForEach-Object { "$($_.Name.PadRight($width))  $($_.Locations -join ' ')" })
+
+    if ($DryRun) {
+        $labels | ForEach-Object { Write-Host "  $_" }
+        Write-Info "No files were deleted"
+        return 0
+    }
+
+    $chosen = @(Select-Items -Labels $labels)
+    if ($chosen.Count -eq 0) {
+        Write-Info "No skills deleted"
+        return 0
+    }
+
+    foreach ($index in $chosen) {
+        foreach ($path in $stale[$index].Paths) {
+            Remove-Item -LiteralPath $path -Recurse -Force
+        }
+    }
+
+    Write-Success "Deleted $($chosen.Count) skill(s)"
     return 0
 }
 
@@ -652,11 +808,12 @@ function Show-Help {
     Write-Host "            Download skills from a GitHub tree URL into home/.agents/skills and home/.claude/skills"
     Write-Host "  doctor    Run read-only diagnostics for managed sync paths"
     Write-Host "  orphans   List target paths that do not exist in home/"
+    Write-Host "  prune     Pick installed skills that are not in home/ to delete"
     Write-Host "  help      Show this help message"
     Write-Host ""
     Write-Host "OPTIONS:"
     Write-Host "  --dotfiles-dir PATH  Override dotfiles directory"
-    Write-Host "  --dry-run            Preview sync changes without copying"
+    Write-Host "  --dry-run            Preview sync or prune without changing files"
     Write-Host "  --version            Show version information"
     Write-Host "  -h, --help           Show this help message"
     Write-Host ""
@@ -713,7 +870,7 @@ function Main {
         }
         "skills" {
             if ($dryRun) {
-                throw "Option --dry-run is only valid with sync"
+                throw "Option --dry-run is only valid with sync and prune"
             }
             if ($commandArgs.Count -eq 0 -or $commandArgs[0] -ne "add") {
                 throw "Usage: .\dot.ps1 skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill=NAME]"
@@ -721,15 +878,20 @@ function Main {
         }
         "doctor" {
             if ($dryRun) {
-                throw "Option --dry-run is only valid with sync"
+                throw "Option --dry-run is only valid with sync and prune"
             }
             if ($commandArgs.Count -gt 0) {
                 throw "Unexpected argument for doctor: $($commandArgs[0])"
             }
         }
+        "prune" {
+            if ($commandArgs.Count -gt 0) {
+                throw "Unexpected argument for prune: $($commandArgs[0])"
+            }
+        }
         "orphans" {
             if ($dryRun) {
-                throw "Option --dry-run is only valid with sync"
+                throw "Option --dry-run is only valid with sync and prune"
             }
             if ($commandArgs.Count -gt 0) {
                 throw "Unexpected argument for orphans: $($commandArgs[0])"
@@ -737,7 +899,7 @@ function Main {
         }
         "help" {
             if ($dryRun) {
-                throw "Option --dry-run is only valid with sync"
+                throw "Option --dry-run is only valid with sync and prune"
             }
             if ($commandArgs.Count -gt 0) {
                 throw "Unexpected argument for help: $($commandArgs[0])"
@@ -782,6 +944,10 @@ function Main {
 
     if ($command -eq "doctor") {
         return (Invoke-Doctor)
+    }
+
+    if ($command -eq "prune") {
+        return (Invoke-Prune -DryRun:$dryRun)
     }
 
     return (Invoke-Orphans)
