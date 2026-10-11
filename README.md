@@ -67,7 +67,7 @@ dotfiles/
 ├── home/                    # Files synced/stowed into $HOME
 │   ├── .config/               # Stowed into ~/.config on macOS/Linux (git, opencode, ...)
 │   ├── .agents/               # Copied to $HOME\.agents on Windows (skills)
-│   ├── .claude/                # Copied to $HOME\.claude on Windows (skills, agents, hooks)
+│   ├── .claude/                # Copied to $HOME\.claude on Windows (skills, agents)
 │   ├── .cursor/                 # Copied to $HOME\.cursor on Windows (agents, commands, skills)
 │   └── .pi/                     # Copied to $HOME\.pi on Windows (agent extensions)
 └── README.md
