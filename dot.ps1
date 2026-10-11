@@ -398,6 +398,247 @@ function Invoke-Doctor {
     return 1
 }
 
+function ConvertFrom-GitHubTreeUrl {
+    param([Parameter(Mandatory)][string]$Url)
+
+    $uri = [System.Uri]$Url
+    $hostName = $uri.Host.ToLowerInvariant()
+    if ($hostName -ne "github.com" -and $hostName -ne "www.github.com") {
+        throw "Expected a GitHub URL like https://github.com/owner/repo/tree/ref/path"
+    }
+
+    $parts = @($uri.AbsolutePath -split "/" | Where-Object { $_ -ne "" } | ForEach-Object { [System.Uri]::UnescapeDataString($_) })
+    if ($parts.Count -lt 4) {
+        throw "Expected a GitHub URL like https://github.com/owner/repo/tree/ref/path"
+    }
+
+    $owner = $parts[0]
+    $repository = $parts[1]
+    if ($repository.EndsWith(".git")) {
+        $repository = $repository.Substring(0, $repository.Length - 4)
+    }
+    if ($parts[2] -ne "tree" -or [string]::IsNullOrWhiteSpace($parts[3])) {
+        throw "URL must point to a file tree or skill directory (.../tree/<ref>/<path>)"
+    }
+
+    $ref = $parts[3]
+    if ($parts.Count -lt 5) {
+        throw "URL must point to a file tree or skill directory (.../tree/<ref>/<path>)"
+    }
+    $treePath = ($parts[4..($parts.Count - 1)] -join "/")
+
+    return [pscustomobject]@{
+        Owner = $owner
+        Repository = $repository
+        Ref = $ref
+        Path = $treePath
+    }
+}
+
+function Find-SkillSource {
+    param([Parameter(Mandatory)][string]$SourceRoot)
+
+    if (Test-Path -LiteralPath (Join-Path $SourceRoot "SKILL.md") -PathType Leaf) {
+        return @(Get-Item -LiteralPath $SourceRoot)
+    }
+
+    $found = @(Get-ChildItem -LiteralPath $SourceRoot -Directory | Where-Object {
+        Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md") -PathType Leaf
+    } | Sort-Object -Property Name)
+
+    return $found
+}
+
+function Select-SkillsInteractively {
+    param([Parameter(Mandatory)][array]$Skills)
+
+    if (Get-Command gum -ErrorAction SilentlyContinue) {
+        $names = @($Skills | ForEach-Object { $_.Name })
+        $selected = @($names | gum choose --no-limit --header "Select skills to install")
+        return @($Skills | Where-Object { $selected -contains $_.Name })
+    }
+
+    Write-Host "gum not found; falling back to numbered prompt (or rerun with --all / --skill NAME)."
+    for ($i = 0; $i -lt $Skills.Count; $i++) {
+        Write-Host ("  [{0}] {1}" -f ($i + 1), $Skills[$i].Name)
+    }
+    $answer = Read-Host "Enter numbers comma-separated, 'all', or blank to cancel"
+    if ([string]::IsNullOrWhiteSpace($answer)) {
+        return @()
+    }
+    if ($answer.Trim().ToLowerInvariant() -eq "all") {
+        return $Skills
+    }
+    $picked = @()
+    foreach ($token in ($answer -split ",")) {
+        $trimmed = $token.Trim()
+        $number = 0
+        if ([int]::TryParse($trimmed, [ref]$number) -and $number -ge 1 -and $number -le $Skills.Count) {
+            $picked += $Skills[$number - 1]
+        }
+        else {
+            throw "Invalid selection: '$trimmed'"
+        }
+    }
+    return @($picked | Sort-Object -Property Name -Unique)
+}
+
+function Invoke-SkillsAdd {
+    param([string[]]$AddArgs)
+
+    $url = $null
+    $force = $false
+    $agentsOnly = $false
+    $claudeOnly = $false
+    $installAll = $false
+    $wanted = New-Object System.Collections.Generic.List[string]
+
+    foreach ($arg in $AddArgs) {
+        switch ($arg) {
+            "--force" { $force = $true }
+            "--agents-only" { $agentsOnly = $true }
+            "--claude-only" { $claudeOnly = $true }
+            "--all" { $installAll = $true }
+            "--help" {
+                Write-Host "USAGE:"
+                Write-Host "  .\dot.ps1 skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill NAME]"
+                Write-Host ""
+                Write-Host "  <url>  GitHub tree URL containing one skill or multiple skill directories"
+                Write-Host "         e.g. https://github.com/owner/repo/tree/main/skills"
+                return 0
+            }
+            default {
+                if ($arg -eq "-h") {
+                    Write-Host "USAGE:"
+                    Write-Host "  .\dot.ps1 skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill NAME]"
+                    return 0
+                }
+                elseif ($arg.StartsWith("--skill=")) {
+                    [void]$wanted.Add($arg.Substring("--skill=".Length))
+                }
+                elseif ($arg.StartsWith("--skill")) {
+                    throw "Use --skill=NAME (repeatable)"
+                }
+                elseif ($arg.StartsWith("--")) {
+                    throw "Unknown option for skills add: $arg"
+                }
+                elseif ($null -eq $url) {
+                    $url = $arg
+                }
+                else {
+                    throw "Unexpected argument for skills add: $arg"
+                }
+            }
+        }
+    }
+
+    if ($agentsOnly -and $claudeOnly) {
+        throw "Options --agents-only and --claude-only are mutually exclusive"
+    }
+    if ([string]::IsNullOrWhiteSpace($url)) {
+        throw "Missing required <url>. Usage: .\dot.ps1 skills add <url> [--force]"
+    }
+    if ($installAll -and $wanted.Count -gt 0) {
+        throw "Options --all and --skill cannot be combined"
+    }
+
+    $tree = ConvertFrom-GitHubTreeUrl -Url $url
+    $agentsRoot = Join-Path $DOTFILES_DIR "home/.agents/skills"
+    $claudeRoot = Join-Path $DOTFILES_DIR "home/.claude/skills"
+    $destRoots = @()
+    if (-not $claudeOnly) {
+        $destRoots += [pscustomobject]@{ Label = ".agents"; Root = $agentsRoot }
+    }
+    if (-not $agentsOnly) {
+        $destRoots += [pscustomobject]@{ Label = ".claude"; Root = $claudeRoot }
+    }
+
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("dotfiles-skills-" + [System.IO.Path]::GetRandomFileName())
+    try {
+        Ensure-Directory -Path $tempRoot
+        $zipPath = Join-Path $tempRoot "repository.zip"
+        $zipUrl = "https://codeload.github.com/" + [System.Uri]::EscapeDataString($tree.Owner) + "/" + [System.Uri]::EscapeDataString($tree.Repository) + "/zip/" + [System.Uri]::EscapeDataString($tree.Ref)
+        Write-Info "Downloading $($tree.Owner)/$($tree.Repository)@$($tree.Ref)..."
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -Headers @{ "User-Agent" = "dotfiles-skills-add" } -ErrorAction Stop
+
+        $extractedPath = Join-Path $tempRoot "extracted"
+        Ensure-Directory -Path $extractedPath
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractedPath -Force
+        $roots = @(Get-ChildItem -LiteralPath $extractedPath -Directory)
+        if ($roots.Count -ne 1) {
+            throw "GitHub archive has an unexpected structure"
+        }
+        $source = Join-Path $roots[0].FullName ($tree.Path -replace "/", [System.IO.Path]::DirectorySeparatorChar)
+        if (-not (Test-Path -LiteralPath $source -PathType Container)) {
+            throw "Path not found in repository: $($tree.Path)"
+        }
+
+        $skills = @(Find-SkillSource -SourceRoot $source)
+        if ($skills.Count -eq 0) {
+            throw "No skill directories (containing SKILL.md) found under $($tree.Path)"
+        }
+
+        $selected = @()
+        if ($wanted.Count -gt 0) {
+            foreach ($name in $wanted) {
+                $match = @($skills | Where-Object { $_.Name -eq $name })
+                if ($match.Count -eq 0) {
+                    throw "Skill not found in archive: $name"
+                }
+                $selected += $match[0]
+            }
+        }
+        elseif ($installAll -or $skills.Count -eq 1) {
+            $selected = $skills
+        }
+        else {
+            $selected = @(Select-SkillsInteractively -Skills $skills)
+        }
+
+        if ($selected.Count -eq 0) {
+            Write-Info "No skills selected."
+            return 0
+        }
+
+        foreach ($dest in $destRoots) {
+            Ensure-Directory -Path $dest.Root
+        }
+
+        $installed = New-Object System.Collections.Generic.List[string]
+        $skipped = New-Object System.Collections.Generic.List[string]
+        foreach ($skill in ($selected | Sort-Object -Property Name)) {
+            foreach ($dest in $destRoots) {
+                $target = Join-Path $dest.Root $skill.Name
+                $qualified = "$($skill.Name) ($($dest.Label))"
+                if (Test-Path -LiteralPath $target) {
+                    if (-not $force) {
+                        [void]$skipped.Add($qualified)
+                        continue
+                    }
+                    Remove-Item -LiteralPath $target -Recurse -Force
+                }
+                Copy-Item -LiteralPath $skill.FullName -Destination $target -Recurse -Force
+                [void]$installed.Add($qualified)
+            }
+        }
+
+        if ($installed.Count -gt 0) {
+            Write-Success ("Installed {0}: {1}" -f $installed.Count, ($installed -join ", "))
+        }
+        if ($skipped.Count -gt 0) {
+            Write-Warn ("Skipped {0} existing: {1}" -f $skipped.Count, ($skipped -join ", "))
+            Write-Info "Run again with --force to replace them."
+        }
+        Write-Info "Next: run '.\dot.ps1 sync' on Windows or './dot stow' on macOS to deploy to `$HOME."
+        return 0
+    }
+    finally {
+        if (Test-Path -LiteralPath $tempRoot) {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function Show-Help {
     Write-Host "$SCRIPT_NAME - Dotfiles management tool (PowerShell)"
     Write-Host "Version: $VERSION"
@@ -407,6 +648,8 @@ function Show-Help {
     Write-Host ""
     Write-Host "COMMANDS:"
     Write-Host "  sync      Sync top-level directories from home/ into `$HOME"
+    Write-Host "  skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill=NAME]"
+    Write-Host "            Download skills from a GitHub tree URL into home/.agents/skills and home/.claude/skills"
     Write-Host "  doctor    Run read-only diagnostics for managed sync paths"
     Write-Host "  orphans   List target paths that do not exist in home/"
     Write-Host "  help      Show this help message"
@@ -468,6 +711,14 @@ function Main {
                 throw "Unknown option for sync: $commandArg"
             }
         }
+        "skills" {
+            if ($dryRun) {
+                throw "Option --dry-run is only valid with sync"
+            }
+            if ($commandArgs.Count -eq 0 -or $commandArgs[0] -ne "add") {
+                throw "Usage: .\dot.ps1 skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill=NAME]"
+            }
+        }
         "doctor" {
             if ($dryRun) {
                 throw "Option --dry-run is only valid with sync"
@@ -504,6 +755,11 @@ function Main {
         return 0
     }
 
+    if ($command -eq "skills" -and $showHelp) {
+        $commandArgs += "--help"
+        $showHelp = $false
+    }
+
     if ($showHelp -or $command -eq "help") {
         Show-Help
         return 0
@@ -513,6 +769,15 @@ function Main {
 
     if ($command -eq "sync") {
         return (Invoke-Sync -DryRun:$dryRun)
+    }
+
+    if ($command -eq "skills") {
+        $addArgs = @(
+            if ($commandArgs.Count -gt 1) {
+                $commandArgs[1..($commandArgs.Count - 1)]
+            }
+        )
+        return (Invoke-SkillsAdd -AddArgs $addArgs)
     }
 
     if ($command -eq "doctor") {

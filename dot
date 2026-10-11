@@ -194,6 +194,191 @@ cmd_stow() {
     stow_dotfiles routine
 }
 
+cmd_skills_add() {
+    local url=""
+    local force=false
+    local agents_only=false
+    local claude_only=false
+    local install_all=false
+    local -a wanted=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force) force=true; shift ;;
+            --agents-only) agents_only=true; shift ;;
+            --claude-only) claude_only=true; shift ;;
+            --all) install_all=true; shift ;;
+            --skill=*) wanted+=("${1#--skill=}"); shift ;;
+            -h|--help)
+                printf "USAGE:\n"
+                printf "    %s skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill=NAME]\n" "$SCRIPT_NAME"
+                printf "\n    <url>  GitHub tree URL with one skill or multiple skill directories\n"
+                return 0
+                ;;
+            --*) print_error "Unknown option for skills add: $1"; return 1 ;;
+            *)
+                if [[ -z "$url" ]]; then url="$1"; shift
+                else print_error "Unexpected argument for skills add: $1"; return 1
+                fi
+                ;;
+        esac
+    done
+
+    if [[ "$agents_only" == true && "$claude_only" == true ]]; then
+        die "Options --agents-only and --claude-only are mutually exclusive"
+    fi
+    if [[ -z "$url" ]]; then
+        die "Missing required <url>. Usage: $SCRIPT_NAME skills add <url> [--force]"
+    fi
+    if [[ "$install_all" == true && "${#wanted[@]}" -gt 0 ]]; then
+        die "Options --all and --skill cannot be combined"
+    fi
+
+    # Parse https://github.com/<owner>/<repo>/tree/<ref>/<path...>
+    local path_part="$url"
+    path_part="${path_part#https://github.com/}"
+    path_part="${path_part#https://www.github.com/}"
+    path_part="${path_part#http://github.com/}"
+    if [[ "$path_part" == "$url" ]]; then
+        die "Expected a GitHub URL like https://github.com/owner/repo/tree/ref/path"
+    fi
+    local owner="${path_part%%/*}"
+    local rest="${path_part#*/}"
+    local repo="${rest%%/*}"
+    rest="${rest#*/}"
+    repo="${repo%.git}"
+    local view="${rest%%/*}"
+    rest="${rest#*/}"
+    local ref="${rest%%/*}"
+    local tree_path="${rest#*/}"
+    if [[ -z "$owner" || -z "$repo" || "$view" != "tree" || -z "$ref" || -z "$tree_path" || "$tree_path" == "$rest" ]]; then
+        die "URL must point to a file tree or skill directory (.../tree/<ref>/<path>)"
+    fi
+
+    local agents_root="$DOTFILES_DIR/home/.agents/skills"
+    local claude_root="$DOTFILES_DIR/home/.claude/skills"
+    local -a dest_labels=()
+    local -a dest_roots=()
+    if [[ "$claude_only" != true ]]; then dest_labels+=(".agents"); dest_roots+=("$agents_root"); fi
+    if [[ "$agents_only" != true ]]; then dest_labels+=(".claude"); dest_roots+=("$claude_root"); fi
+
+    command_exists curl || die "curl is required for skills add"
+    command_exists unzip || die "unzip is required for skills add"
+
+    local tmpdir
+    tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-skills-XXXXXX")"
+    trap 'rm -rf "${tmpdir:-}"' EXIT
+
+    print_info "Downloading $owner/$repo@$ref..."
+    curl -fsSL -A "dotfiles-skills-add" -o "$tmpdir/repository.zip" \
+        "https://codeload.github.com/$owner/$repo/zip/$ref"
+
+    mkdir -p "$tmpdir/extracted"
+    unzip -q "$tmpdir/repository.zip" -d "$tmpdir/extracted"
+
+    local -a roots=("$tmpdir/extracted"/*/)
+    if [[ "${#roots[@]}" -ne 1 ]]; then
+        die "GitHub archive has an unexpected structure"
+    fi
+    local source="${roots[0]}${tree_path}"
+    [[ -d "$source" ]] || die "Path not found in repository: $tree_path"
+
+    local -a skills=()
+    if [[ -f "$source/SKILL.md" ]]; then
+        skills=("$source")
+    else
+        local d
+        for d in "$source"/*/; do
+            [[ -d "$d" ]] || continue
+            [[ -f "${d}SKILL.md" ]] || continue
+            skills+=("${d%/}")
+        done
+    fi
+    if [[ "${#skills[@]}" -eq 0 ]]; then
+        die "No skill directories (containing SKILL.md) found under $tree_path"
+    fi
+
+    local -a selected=()
+    if [[ "${#wanted[@]}" -gt 0 ]]; then
+        local w s found
+        for w in "${wanted[@]}"; do
+            found=false
+            for s in "${skills[@]}"; do
+                if [[ "$(basename "$s")" == "$w" ]]; then selected+=("$s"); found=true; break; fi
+            done
+            [[ "$found" == true ]] || die "Skill not found in archive: $w"
+        done
+    elif [[ "$install_all" == true || "${#skills[@]}" -eq 1 ]]; then
+        selected=("${skills[@]}")
+    elif command_exists gum; then
+        local -a names=()
+        local s
+        for s in "${skills[@]}"; do names+=("$(basename "$s")"); done
+        local chosen
+        chosen="$(printf '%s\n' "${names[@]}" | gum choose --no-limit --header "Select skills to install")"
+        [[ -z "$chosen" ]] || while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            for s in "${skills[@]}"; do
+                if [[ "$(basename "$s")" == "$line" ]]; then selected+=("$s"); break; fi
+            done
+        done <<< "$chosen"
+    else
+        print_info "gum not found; falling back to numbered prompt (or rerun with --all / --skill=NAME)."
+        local i
+        for i in "${!skills[@]}"; do printf '  [%d] %s\n' "$((i + 1))" "$(basename "${skills[$i]}")"; done
+        local answer
+        read -rp "Enter numbers comma-separated, 'all', or blank to cancel: " answer
+        [[ -z "${answer// }" ]] && { print_info "No skills selected."; return 0; }
+        if [[ "${answer,,}" == "all" ]]; then selected=("${skills[@]}")
+        else
+            local token
+            IFS=',' read -ra tokens <<< "$answer"
+            for token in "${tokens[@]}"; do
+                token="${token// /}"
+                if [[ "$token" =~ ^[0-9]+$ && "$token" -ge 1 && "$token" -le "${#skills[@]}" ]]; then
+                    selected+=("${skills[$((token - 1))]}")
+                else die "Invalid selection: '$token'"
+                fi
+            done
+        fi
+    fi
+
+    if [[ "${#selected[@]}" -eq 0 ]]; then
+        print_info "No skills selected."
+        return 0
+    fi
+
+    local i
+    for i in "${!dest_roots[@]}"; do mkdir -p "${dest_roots[$i]}"; done
+
+    local -a installed=() skipped=()
+    local skill name target
+    for skill in "${selected[@]}"; do
+        name="$(basename "$skill")"
+        for i in "${!dest_roots[@]}"; do
+            target="${dest_roots[$i]}/$name"
+            if [[ -e "$target" && "$force" != true ]]; then
+                skipped+=("$name (${dest_labels[$i]})")
+                continue
+            fi
+            rm -rf "$target"
+            cp -R "$skill" "$target"
+            installed+=("$name (${dest_labels[$i]})")
+        done
+    done
+
+    if [[ "${#installed[@]}" -gt 0 ]]; then
+        print_success "Installed ${#installed[@]}: ${installed[*]}"
+    fi
+    if [[ "${#skipped[@]}" -gt 0 ]]; then
+        print_warning "Skipped ${#skipped[@]} existing: ${skipped[*]}"
+        print_info "Run again with --force to replace them."
+    fi
+    print_info 'Next: run `./dot stow` on macOS or `.\dot.ps1 sync` on Windows to deploy to $HOME.'
+    trap - EXIT
+    rm -rf "$tmpdir"
+}
+
 cmd_help() {
     printf "${BOLD}%s${RESET} - Dotfiles management tool\n" "$SCRIPT_NAME"
     printf "Version: %s\n\n" "$VERSION"
@@ -205,6 +390,7 @@ cmd_help() {
     printf "    init                Initialize dotfiles without adopting existing config files\n"
     printf "    doctor              Run diagnostics and check installation\n"
     printf "    stow                Create symlinks for dotfiles using GNU Stow\n"
+    printf "    skills add <url>    Download skills from a GitHub tree URL into home/.agents/skills and home/.claude/skills\n"
     printf "    help                Show this help message (default)\n\n"
 
     printf "${BOLD}OPTIONS:${RESET}\n"
@@ -215,6 +401,7 @@ cmd_help() {
     printf "${BOLD}EXAMPLES:${RESET}\n"
     printf "    %s init\n" "$SCRIPT_NAME"
     printf "    %s stow\n" "$SCRIPT_NAME"
+    printf "    %s skills add https://github.com/owner/repo/tree/main/skills --all\n" "$SCRIPT_NAME"
     printf "\n"
 }
 
@@ -251,6 +438,15 @@ main() {
             ;;
         stow)
             cmd_stow "$@"
+            ;;
+        skills)
+            local sub="${1:-}"
+            shift || true
+            if [[ "$sub" != "add" ]]; then
+                print_error "Usage: $SCRIPT_NAME skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill=NAME]"
+                exit 1
+            fi
+            cmd_skills_add "$@"
             ;;
         help)
             cmd_help
