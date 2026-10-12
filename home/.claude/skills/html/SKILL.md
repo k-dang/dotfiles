@@ -70,8 +70,8 @@ Requests can span forms. Read every reference that materially applies, then give
 
 ## Finish the work
 
-Write the file to the requested location, or choose a clear filename in the current workspace. When browser tooling is available, open it and inspect a wide and narrow viewport. Exercise its controls, check the console, and fix clipping, overlap, illegible text, broken states, and accidental overflow.
+Write the file to the requested location, or choose a clear filename in the current workspace. Default to a source review for content completeness, self-contained dependencies, responsive CSS, and obvious markup or script errors, then deliver. For personal documents, let the user's feedback guide visual refinements.
 
-Before delivery, run one originality check: if the subject were swapped for a neighboring topic, would the same visual concept still make just as much sense? If yes, the direction is too generic; revise the composition, type, color, imagery, or interaction so it belongs to this subject.
+Use browser inspection when the user explicitly requests it or substantial interaction needs testing. Focus on the relevant flow, states, and keyboard behavior; inspect wide and narrow viewports when responsive behavior matters. Capture screenshots only when needed to assess a specific issue, and repeat inspection only to confirm a fix or resolve uncertainty. This verification policy also applies to the references loaded by this skill.
 
 Return the absolute path and a short description of the artifact's visual and interaction choices.
