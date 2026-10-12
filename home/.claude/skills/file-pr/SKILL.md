@@ -15,7 +15,7 @@ BAD
 GOOD
 > ✅ perf(server): cut websocket frame size by 70%+ with gzipping
 
-Follow PR templates when they are available. The template owns the sections — never add top-level headings it does not define. Use show-me visuals inside its sections (e.g. under "Changes") to express the change compactly. If the template is explicitly minimal, skip the outline entirely.
+Follow PR templates when they are available. Place visuals and evidence inside the template's existing sections (e.g. under "Changes").
 
 Open the description with a simple explanation of the problem based on the user's original prompt, then briefly explain the solution. Do not lead with an implementation inventory:
 
@@ -29,16 +29,29 @@ GOOD
 
 Gather only what is needed to explain the change: the ticket/task artifacts, the complete diff against the base plus enough surrounding code to understand behavior and ownership, and `gh pr view` metadata / changed files when a PR already exists.
 
+## Gather evidence
+
+Before filing or updating, obtain evidence for the changed behavior:
+
+- Visible UI changes require before/after screenshots of the base and changed versions at the same viewport and corresponding state. For new UI, capture an after-only preview. Use a recording when motion or interaction is needed to show the change.
+- Functional changes require focused test or command results. For bug fixes, reproduce the failure on the base and show the corrected behavior on the changed version.
+
+For screenshots or recordings, load the `before-and-after` skill and follow its capture and PR attachment workflow. Embed the published media in the PR description. Diagrams explain logic or structure; captures show the actual UI behavior.
+
+If capture or verification is blocked, document the attempted step, concrete blocker, and missing evidence in the PR description.
+
 ## Change outline
 
-Default to a compact visual showing the change. Omit it for straightforward local or mechanical edits whose effect is fully explained by the opener, such as copy corrections, internal renames, or changing a single value. Include a visual when understanding the change requires following execution order, state transitions, interactions between components, or changes to structure or ownership. Screenshots count when they show the relevant behavior.
+Load the `show-me` skill for every PR and default to a compact visual showing the change. Use `references/show-me.md` for PR formatting. Evidence captures can serve as the outline when they explain the change.
 
-When an outline is needed, place it after the opener and scale it to the change:
+Omit the explanatory outline only for straightforward local or mechanical edits fully explained by the opener, or an explicitly minimal template. Evidence requirements still apply.
+
+Place the outline after the opener and scale it to the change:
 
 - Simple single-concern PRs get one small visual showing the core logic or data flow.
 - Complex PRs get a fuller outline. Complex means the reviewer could misread scope without it: multiple areas, cross-package changes, API/SQL contract changes, migrations, or surprising decisions/omissions.
 
-Include only views that help explain this PR, ordered to tell the story. Omit categories that did not change. See `references/show-me.md` for formatting conventions.
+Include only views that help explain this PR, ordered to tell the story. Omit categories that did not change.
 
 - Endpoint request/response contracts and SQL table / column changes.
 - Key data structure / type changes.
@@ -51,15 +64,13 @@ Prefer `diff` blocks when showing changes to an existing shape. Show the complet
 
 Write as one human talking to another: simple, coherent, concise language, no jargon or slang.
 
-## Evidence
-
-Use diagrams to explain the change and verification actually performed to substantiate behavior: screenshots for visual behavior, or focused test/command results for functional changes. For bug fixes, include observed before/after behavior when available. State material verification gaps.
-
 ## Merge risk
 
 For changes with irreversible effects, impact beyond the changed component, or rollout/recovery requirements, briefly name who or what is affected and whether reverting the code fully restores the previous behavior. Note irreversible effects and any required rollout or recovery steps.
 
 ## Report completion
+
+Before reporting completion, inspect the rendered PR description. Every required capture, verification result, and outline must be present, with media loading correctly, or have a concrete blocker documented in the description.
 
 After filing or updating, respond with the PR URL and a brief summary of the outcome. Mention verification results, caveats, or decisions that affect the user's next step. Include changed-file details only when they help the user locate something they need to inspect or act on.
 
