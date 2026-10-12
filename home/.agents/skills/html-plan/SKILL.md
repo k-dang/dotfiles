@@ -40,6 +40,8 @@ Do not add a timeline, progress percentage, status badge, or dashboard summary u
 
 Deliver one responsive, accessible, self-contained HTML file. Use semantic headings, lists, tables, and landmarks. Keep essential CSS and JavaScript inline, avoid external services, and make any navigation or disclosure keyboard-operable.
 
-Inspect the result at wide and narrow widths. Check that no commitment disappeared, that stages remain in the intended order, that ownership and dependencies are legible, and that long content does not overflow.
+Default to a source review: check that no commitment disappeared, that stages remain in the intended order, that ownership and dependencies are clear, and that the markup and responsive CSS handle long content. Deliver the plan and let the user's feedback guide visual refinements.
+
+Use browser inspection when the user explicitly requests it or substantial interaction needs testing. Focus on the relevant behavior; inspect wide and narrow widths when responsive behavior matters. Capture screenshots only to assess a specific issue, and repeat inspection only to confirm a fix or resolve uncertainty.
 
 Return the absolute path and note any structural interpretation you introduced.
