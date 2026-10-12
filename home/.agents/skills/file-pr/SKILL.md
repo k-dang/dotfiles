@@ -31,7 +31,9 @@ Gather only what is needed to explain the change: the ticket/task artifacts, the
 
 ## Change outline
 
-Every PR follows the opener with at least one visual, in place of prose or a file-by-file changelog. Scale the outline to the change:
+Default to a compact visual showing the change. Omit it for straightforward local or mechanical edits whose effect is fully explained by the opener, such as copy corrections, internal renames, or changing a single value. Include a visual when understanding the change requires following execution order, state transitions, interactions between components, or changes to structure or ownership. Screenshots count when they show the relevant behavior.
+
+When an outline is needed, place it after the opener and scale it to the change:
 
 - Simple single-concern PRs get one small visual showing the core logic or data flow.
 - Complex PRs get a fuller outline. Complex means the reviewer could misread scope without it: multiple areas, cross-package changes, API/SQL contract changes, migrations, or surprising decisions/omissions.
@@ -49,7 +51,15 @@ Prefer `diff` blocks when showing changes to an existing shape. Show the complet
 
 Write as one human talking to another: simple, coherent, concise language, no jargon or slang.
 
+## Evidence
+
+Use diagrams to explain the change and verification actually performed to substantiate behavior: screenshots for visual behavior, or focused test/command results for functional changes. For bug fixes, include observed before/after behavior when available. State material verification gaps.
+
+## Merge risk
+
+For changes with irreversible effects, impact beyond the changed component, or rollout/recovery requirements, briefly name who or what is affected and whether reverting the code fully restores the previous behavior. Note irreversible effects and any required rollout or recovery steps.
+
 ## Report completion
 
-After filing or updating, respond with the PR URL, a 2-3 sentence summary of what it does plus key decisions, and a concise list of changed files with one-line descriptions.
+After filing or updating, respond with the PR URL and a brief summary of the outcome. Mention verification results, caveats, or decisions that affect the user's next step. Include changed-file details only when they help the user locate something they need to inspect or act on.
 
