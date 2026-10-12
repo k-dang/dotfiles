@@ -20,6 +20,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$SCRIPT_DIR"
 SKILL_DIRS=(".claude/skills" ".agents/skills")
 
+# Single source of truth for the skills add invocation. Referenced by the command
+# itself, the argument dispatcher, and the top-level help so they cannot drift.
+readonly SKILLS_ADD_USAGE="${SCRIPT_NAME} skills add <url> [--force] [--agents-only|--claude-only] [--all] [--dry-run] [--skill=NAME]"
+
 print_header() {
     printf "\n${BOLD}${BLUE}==>${RESET} ${BOLD}%s${RESET}\n" "$1"
 }
@@ -195,12 +199,84 @@ cmd_stow() {
     stow_dotfiles routine
 }
 
+# Reads the `description:` key out of a SKILL.md YAML frontmatter. Only the
+# simple one-line form is handled; a folded (> or |) block is reported as-is,
+# which is still more useful in a picker than no description at all. The closing
+# --- is the only terminator: every other frontmatter key is unindented.
+get_skill_description() {
+    local file="$1/SKILL.md"
+    [[ -f "$file" ]] || return 0
+
+    local line desc="" in_fm=0 seen_fence=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" =~ ^---[[:space:]]*$ ]]; then
+            if ((seen_fence == 0)); then
+                in_fm=1
+                seen_fence=1
+                continue
+            fi
+            break
+        fi
+        ((in_fm == 1)) || continue
+        if [[ "$line" =~ ^description[[:space:]]*:[[:space:]]*(.*)$ ]]; then
+            desc="${BASH_REMATCH[1]}"
+            desc="${desc#"${desc%%[![:space:]]*}"}"   # trim leading space
+            desc="${desc%"${desc##*[![:space:]]}"}"   # trim trailing space
+            desc="${desc%\"}"; desc="${desc#\"}"
+            desc="${desc%\'}"; desc="${desc#\'}"
+            printf '%s' "$desc"
+            return 0
+        fi
+    done <"$file"
+}
+
+# "name  description" on one line, whitespace squeezed and truncated so the
+# picker stays readable when descriptions run long.
+format_skill_label() {
+    local name="$1" desc="$2"
+    [[ -n "$desc" ]] || { printf '%s' "$name"; return 0; }
+
+    desc="$(printf '%s' "$desc" | tr '\n\r\t' '   ' | tr -s ' ')"
+    desc="${desc#"${desc%%[![:space:]]*}"}"
+    desc="${desc%"${desc##*[![:space:]]}"}"
+
+    if ((${#desc} > 72)); then
+        desc="${desc:0:69}..."
+    fi
+    printf '%s  %s' "$name" "$desc"
+}
+
+# Destructive steps ask first, but only when a human is there to answer. With
+# stdin redirected (a script, a CI job) prompting would hang, so --force stands
+# on its own and this returns success.
+confirm_destructive_action() {
+    local verb="$1" count="$2" subject="$3"
+    [[ -t 0 ]] || return 0
+
+    local noun="$subject"
+    ((count != 1)) && noun="${subject}s"
+
+    local reply
+    while true; do
+        read -rp "${verb} ${count} existing ${noun}? [y/N] " reply || reply=""
+        reply="${reply,,}"
+        reply="${reply#"${reply%%[![:space:]]*}"}"
+        [[ -z "$reply" ]] && return 1
+        case "$reply" in
+            y|yes) return 0 ;;
+            n|no) return 1 ;;
+            *) print_warning "Please answer y or n." ;;
+        esac
+    done
+}
+
 cmd_skills_add() {
     local url=""
     local force=false
     local agents_only=false
     local claude_only=false
     local install_all=false
+    local dry_run=false
     local -a wanted=()
 
     while [[ $# -gt 0 ]]; do
@@ -209,11 +285,15 @@ cmd_skills_add() {
             --agents-only) agents_only=true; shift ;;
             --claude-only) claude_only=true; shift ;;
             --all) install_all=true; shift ;;
+            --dry-run) dry_run=true; shift ;;
             --skill=*) wanted+=("${1#--skill=}"); shift ;;
             -h|--help)
                 printf "USAGE:\n"
-                printf "    %s skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill=NAME]\n" "$SCRIPT_NAME"
+                printf "    %s\n" "$SKILLS_ADD_USAGE"
                 printf "\n    <url>  GitHub tree URL with one skill or multiple skill directories\n"
+                printf "           e.g. https://github.com/owner/repo/tree/main/skills\n"
+                printf "\n    Prompts for which skills to install unless --all or --skill=NAME is given.\n"
+                printf "\n    --force  Replace skills that are already installed (asks first on a terminal)\n"
                 return 0
                 ;;
             --*) print_error "Unknown option for skills add: $1"; return 1 ;;
@@ -229,7 +309,7 @@ cmd_skills_add() {
         die "Options --agents-only and --claude-only are mutually exclusive"
     fi
     if [[ -z "$url" ]]; then
-        die "Missing required <url>. Usage: $SCRIPT_NAME skills add <url> [--force]"
+        die "Missing required <url>. Usage: $SKILLS_ADD_USAGE"
     fi
     if [[ "$install_all" == true && "${#wanted[@]}" -gt 0 ]]; then
         die "Options --all and --skill cannot be combined"
@@ -299,47 +379,84 @@ cmd_skills_add() {
         die "No skill directories (containing SKILL.md) found under $tree_path"
     fi
 
+    # Names and labels are built once so --skill=, the gum picker, and the
+    # numbered prompt all agree on what a skill is called.
+    local -a skill_names=() skill_labels=()
+    local s desc
+    for s in "${skills[@]}"; do
+        desc="$(get_skill_description "$s")"
+        skill_names+=("$(basename "$s")")
+        skill_labels+=("$(format_skill_label "$(basename "$s")" "$desc")")
+    done
+
     local -a selected=()
+    local i w found prompt_for_selection=false
     if [[ "${#wanted[@]}" -gt 0 ]]; then
-        local w s found
         for w in "${wanted[@]}"; do
             found=false
-            for s in "${skills[@]}"; do
-                if [[ "$(basename "$s")" == "$w" ]]; then selected+=("$s"); found=true; break; fi
+            for i in "${!skills[@]}"; do
+                if [[ "${skill_names[$i]}" == "$w" ]]; then selected+=("${skills[$i]}"); found=true; break; fi
             done
             [[ "$found" == true ]] || die "Skill not found in archive: $w"
         done
-    elif [[ "$install_all" == true || "${#skills[@]}" -eq 1 ]]; then
+    elif [[ "$install_all" == true ]]; then
         selected=("${skills[@]}")
-    elif command_exists gum; then
-        local -a names=()
-        local s
-        for s in "${skills[@]}"; do names+=("$(basename "$s")"); done
-        local chosen
-        chosen="$(printf '%s\n' "${names[@]}" | gum choose --no-limit --header "Select skills to install")"
-        [[ -z "$chosen" ]] || while IFS= read -r line; do
-            [[ -z "$line" ]] && continue
-            for s in "${skills[@]}"; do
-                if [[ "$(basename "$s")" == "$line" ]]; then selected+=("$s"); break; fi
-            done
-        done <<< "$chosen"
     else
-        print_info "gum not found; falling back to numbered prompt (or rerun with --all / --skill=NAME)."
-        local i
-        for i in "${!skills[@]}"; do printf '  [%d] %s\n' "$((i + 1))" "$(basename "${skills[$i]}")"; done
-        local answer
-        read -rp "Enter numbers comma-separated, 'all', or blank to cancel: " answer
-        [[ -z "${answer// }" ]] && { print_info "No skills selected."; return 0; }
-        if [[ "${answer,,}" == "all" ]]; then selected=("${skills[@]}")
+        # Interactive is the default: --all and --skill= are the opt-outs.
+        prompt_for_selection=true
+    fi
+
+    if $prompt_for_selection; then
+        # gum needs a real terminal. With stdin redirected it would block
+        # forever, so fall through to the numbered prompt, which reads a pipe
+        # just fine.
+        if command_exists gum && [[ -t 0 ]]; then
+            local chosen line
+            chosen="$(printf '%s\n' "${skill_labels[@]}" | gum choose --no-limit --header "Select skills to install")"
+            if [[ -n "$chosen" ]]; then
+                while IFS= read -r line; do
+                    [[ -z "$line" ]] && continue
+                    for i in "${!skills[@]}"; do
+                        if [[ "${skill_labels[$i]}" == "$line" ]]; then selected+=("${skills[$i]}"); break; fi
+                    done
+                done <<<"$chosen"
+            fi
         else
-            local token
-            IFS=',' read -ra tokens <<< "$answer"
-            for token in "${tokens[@]}"; do
-                token="${token// /}"
-                if [[ "$token" =~ ^[0-9]+$ && "$token" -ge 1 && "$token" -le "${#skills[@]}" ]]; then
-                    selected+=("${skills[$((token - 1))]}")
-                else die "Invalid selection: '$token'"
+            print_info "gum unavailable or stdin redirected; falling back to numbered prompt (or rerun with --all / --skill=NAME)."
+            local n
+            for n in "${!skills[@]}"; do printf '  [%d] %s\n' "$((n + 1))" "${skill_labels[$n]}"; done
+
+            # Re-prompt on bad input instead of aborting: the download has
+            # already happened, so losing the whole run to a typo is the wrong
+            # trade.
+            local answer token bad
+            local -a tokens=() picked=()
+            while true; do
+                read -rp "Enter numbers comma-separated, 'all', or blank to cancel: " answer || answer=""
+                [[ -z "${answer// }" ]] && { selected=(); break; }
+                if [[ "${answer,,}" == "all" ]]; then
+                    selected=("${skills[@]}")
+                    break
                 fi
+
+                picked=()
+                bad=""
+                IFS=',' read -ra tokens <<<"$answer"
+                for token in "${tokens[@]}"; do
+                    token="${token// /}"
+                    if [[ "$token" =~ ^[0-9]+$ && "$token" -ge 1 && "$token" -le "${#skills[@]}" ]]; then
+                        picked+=("${skills[$((token - 1))]}")
+                    else
+                        bad="$token"
+                        break
+                    fi
+                done
+                if [[ -n "$bad" ]]; then
+                    print_warning "Not a valid selection: '$bad'. Pick 1-${#skills[@]}, or 'all'."
+                    continue
+                fi
+                selected=("${picked[@]}")
+                break
             done
         fi
     fi
@@ -349,33 +466,76 @@ cmd_skills_add() {
         return 0
     fi
 
-    local i
-    for i in "${!dest_roots[@]}"; do mkdir -p "${dest_roots[$i]}"; done
-
-    local -a installed=() skipped=()
-    local skill name target
+    # Resolve every target before writing anything, so a single confirmation
+    # can cover the whole run instead of one prompt per file.
+    local -a plan_action=() plan_target=() plan_source=() plan_qualified=()
+    local replace_count=0
+    local skill name target action
     for skill in "${selected[@]}"; do
         name="$(basename "$skill")"
         for i in "${!dest_roots[@]}"; do
-            target="${dest_roots[$i]}/$name"
-            if [[ -e "$target" && "$force" != true ]]; then
-                skipped+=("$name (${dest_labels[$i]})")
-                continue
+            target="${dest_roots[$i]}/${name}"
+            if [[ ! -e "$target" ]]; then
+                action=install
+            elif [[ "$force" == true ]]; then
+                action=replace
+                ((++replace_count))
+            else
+                action=skip
             fi
-            rm -rf "$target"
-            cp -R "$skill" "$target"
-            installed+=("$name (${dest_labels[$i]})")
+            plan_action+=("$action")
+            plan_target+=("$target")
+            plan_source+=("$skill")
+            plan_qualified+=("$name (${dest_labels[$i]})")
         done
     done
 
+    if [[ "$replace_count" -gt 0 ]] && ! $dry_run; then
+        if ! confirm_destructive_action "Replace" "$replace_count" "skill"; then
+            print_info "Cancelled; nothing was installed."
+            trap - EXIT
+            rm -rf "$tmpdir"
+            return 0
+        fi
+    fi
+
+    if ! $dry_run; then
+        for i in "${!dest_roots[@]}"; do mkdir -p "${dest_roots[$i]}"; done
+    fi
+
+    local -a installed=() skipped=()
+    for i in "${!plan_action[@]}"; do
+        action="${plan_action[$i]}"
+        if [[ "$action" == "skip" ]]; then
+            skipped+=("${plan_qualified[$i]}")
+            continue
+        fi
+        if $dry_run; then
+            print_info "[dry-run] would ${action} ${plan_target[$i]}"
+            installed+=("${plan_qualified[$i]}")
+            continue
+        fi
+        rm -rf "${plan_target[$i]}"
+        cp -R "${plan_source[$i]}" "${plan_target[$i]}"
+        installed+=("${plan_qualified[$i]}")
+    done
+
     if [[ "${#installed[@]}" -gt 0 ]]; then
-        print_success "Installed ${#installed[@]}: ${installed[*]}"
+        if $dry_run; then
+            print_success "Dry run would install ${#installed[@]}: ${installed[*]}"
+        else
+            print_success "Installed ${#installed[@]}: ${installed[*]}"
+        fi
     fi
     if [[ "${#skipped[@]}" -gt 0 ]]; then
         print_warning "Skipped ${#skipped[@]} existing: ${skipped[*]}"
         print_info "Run again with --force to replace them."
     fi
-    print_info 'Next: run `./dot stow` on macOS or `.\dot.ps1 sync` on Windows to deploy to $HOME.'
+    if $dry_run; then
+        print_info "No files were changed"
+    else
+        print_info 'Next: run `./dot stow` on macOS or `.\dot.ps1 sync` on Windows to deploy to $HOME.'
+    fi
     trap - EXIT
     rm -rf "$tmpdir"
 }
@@ -464,6 +624,7 @@ cmd_help() {
     printf "    doctor              Run diagnostics and check installation\n"
     printf "    stow                Create symlinks for dotfiles using GNU Stow\n"
     printf "    skills add <url>    Download skills from a GitHub tree URL into home/.agents/skills and home/.claude/skills\n"
+    printf "                        (prompts unless --all / --skill=NAME; see '%s skills add --help')\n" "$SCRIPT_NAME"
     printf "    prune [--dry-run]   Pick installed skills that are not in home/ to delete\n"
     printf "    help                Show this help message (default)\n\n"
 
@@ -516,8 +677,12 @@ main() {
         skills)
             local sub="${1:-}"
             shift || true
+            # `skills --help` and `skills` on their own should print the skills add
+            # usage rather than the usage error, matching the other commands.
+            if [[ -z "$sub" ]]; then sub="add"; set -- --help "$@"; fi
+            if [[ "$sub" == "-h" || "$sub" == "--help" ]]; then sub="add"; set -- --help "$@"; fi
             if [[ "$sub" != "add" ]]; then
-                print_error "Usage: $SCRIPT_NAME skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill=NAME]"
+                print_error "Usage: $SKILLS_ADD_USAGE"
                 exit 1
             fi
             cmd_skills_add "$@"

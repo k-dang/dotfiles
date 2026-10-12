@@ -10,6 +10,10 @@ $DOTFILES_DIR = $PSScriptRoot
 $SYNC_PAIRS = @()
 $SKILL_DIRS = @(".claude/skills", ".agents/skills")
 
+# Single source of truth for the skills add invocation. Referenced by the command
+# itself, the argument dispatcher, and the top-level help so they cannot drift.
+$SKILLS_ADD_USAGE = ".\dot.ps1 skills add <url> [--force] [--agents-only|--claude-only] [--all] [--dry-run] [--skill=NAME]"
+
 function Write-Header {
     param([Parameter(Mandatory)][string]$Message)
     Write-Host ""
@@ -605,42 +609,157 @@ function Find-SkillSource {
     return $found
 }
 
+function Get-SkillDescription {
+    param([Parameter(Mandatory)][string]$SkillDirectory)
+
+    $skillFile = Join-Path $SkillDirectory "SKILL.md"
+    if (-not (Test-Path -LiteralPath $skillFile -PathType Leaf)) {
+        return $null
+    }
+
+    # Read the `description:` key out of the YAML frontmatter. Only the simple
+    # one-line form is handled; a folded (> or |) block is reported as-is, which
+    # is still more useful in a picker than no description at all. The closing
+    # --- is the only terminator: every other frontmatter key is unindented.
+    $inFrontmatter = $false
+    foreach ($line in @(Get-Content -LiteralPath $skillFile -TotalCount 40 -ErrorAction SilentlyContinue)) {
+        if ($line -match '^\s*---\s*$') {
+            if ($inFrontmatter) { break }
+            $inFrontmatter = $true
+            continue
+        }
+        if (-not $inFrontmatter) { continue }
+        if ($line -match '^\s*description\s*:\s*(.*)$') {
+            $value = $Matches[1].Trim()
+            if ($value.StartsWith('"') -and $value.EndsWith('"') -and $value.Length -gt 1) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+            return $value.Trim()
+        }
+    }
+    return $null
+}
+
+function Format-SkillLabel {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [AllowNull()][string]$Description,
+        [int]$MaxDescriptionLength = 72
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Description)) {
+        return $Name
+    }
+
+    $description = ($Description -replace '\s+', ' ').Trim()
+    if ($description.Length -gt $MaxDescriptionLength) {
+        $description = $description.Substring(0, $MaxDescriptionLength - 3) + "..."
+    }
+
+    return "$Name  $description"
+}
+
 function Select-SkillsInteractively {
-    param([Parameter(Mandatory)][array]$Skills)
+    param(
+        [Parameter(Mandatory)][array]$Skills,
+        [Parameter(Mandatory)][hashtable]$Descriptions
+    )
 
-    if (Get-Command gum -ErrorAction SilentlyContinue) {
-        $names = @($Skills | ForEach-Object { $_.Name })
-        $selected = @($names | gum choose --no-limit --header "Select skills to install")
-        return @($Skills | Where-Object { $selected -contains $_.Name })
+    $labels = @($Skills | ForEach-Object { Format-SkillLabel -Name $_.Name -Description $Descriptions[$_.Name] })
+
+    # gum needs a real terminal. With stdin redirected it would block forever,
+    # so fall through to the numbered prompt, which reads a pipe just fine.
+    $gumUsable = (Get-Command gum -ErrorAction SilentlyContinue) -and -not [Console]::IsInputRedirected
+
+    if ($gumUsable) {
+        $selected = @($labels | gum choose --no-limit --header "Select skills to install")
+        return @($Skills | Where-Object { $selected -contains (Format-SkillLabel -Name $_.Name -Description $Descriptions[$_.Name]) })
     }
 
-    Write-Host "gum not found; falling back to numbered prompt (or rerun with --all / --skill NAME)."
+    Write-Host "gum unavailable or stdin redirected; falling back to numbered prompt (or rerun with --all / --skill=NAME)."
     for ($i = 0; $i -lt $Skills.Count; $i++) {
-        Write-Host ("  [{0}] {1}" -f ($i + 1), $Skills[$i].Name)
+        Write-Host ("  [{0}] {1}" -f ($i + 1), $labels[$i])
     }
-    $answer = Read-Host "Enter numbers comma-separated, 'all', or blank to cancel"
-    if ([string]::IsNullOrWhiteSpace($answer)) {
-        return @()
-    }
-    if ($answer.Trim().ToLowerInvariant() -eq "all") {
-        return $Skills
-    }
-    $picked = @()
-    foreach ($token in ($answer -split ",")) {
-        $trimmed = $token.Trim()
-        $number = 0
-        if ([int]::TryParse($trimmed, [ref]$number) -and $number -ge 1 -and $number -le $Skills.Count) {
-            $picked += $Skills[$number - 1]
+
+    # Re-prompt on bad input instead of aborting: the download has already
+    # happened, so throwing away the whole run over a typo is the wrong trade.
+    while ($true) {
+        $answer = Read-Host "Enter numbers comma-separated, 'all', or blank to cancel"
+        if ([string]::IsNullOrWhiteSpace($answer)) {
+            return @()
         }
-        else {
-            throw "Invalid selection: '$trimmed'"
+        if ($answer.Trim().ToLowerInvariant() -eq "all") {
+            return $Skills
+        }
+
+        $picked = @()
+        $bad = $null
+        foreach ($token in ($answer -split ",")) {
+            $trimmed = $token.Trim()
+            $number = 0
+            if ([int]::TryParse($trimmed, [ref]$number) -and $number -ge 1 -and $number -le $Skills.Count) {
+                $picked += $Skills[$number - 1]
+            }
+            else {
+                $bad = $trimmed
+                break
+            }
+        }
+
+        if ($bad) {
+            Write-Warn "Not a valid selection: '$bad'. Pick 1-$($Skills.Count), or 'all'."
+            continue
+        }
+
+        return @($picked | Sort-Object -Property Name -Unique)
+    }
+}
+
+# Destructive steps ask first, but only when a human is there to answer. With
+# stdin redirected (a script, a CI job) prompting would hang, so --force stands
+# on its own and this returns true.
+function Confirm-DestructiveAction {
+    param(
+        [Parameter(Mandatory)][string]$Verb,
+        [Parameter(Mandatory)][int]$Count,
+        [Parameter(Mandatory)][string]$Subject
+    )
+
+    if ([Console]::IsInputRedirected) {
+        return $true
+    }
+
+    return Read-Confirmation -Verb $Verb -Count $Count -Subject $Subject
+}
+
+function Read-Confirmation {
+    param(
+        [Parameter(Mandatory)][string]$Verb,
+        [Parameter(Mandatory)][int]$Count,
+        [Parameter(Mandatory)][string]$Subject
+    )
+
+    $noun = if ($Count -eq 1) { $Subject } else { "${Subject}s" }
+    while ($true) {
+        $answer = Read-Host "${Verb} $Count existing ${noun}? [y/N]"
+        if ($null -eq $answer -or [string]::IsNullOrWhiteSpace($answer)) {
+            return $false
+        }
+        switch ($answer.Trim().ToLowerInvariant()) {
+            "y" { return $true }
+            "yes" { return $true }
+            "n" { return $false }
+            "no" { return $false }
+            default { Write-Warn "Please answer y or n." }
         }
     }
-    return @($picked | Sort-Object -Property Name -Unique)
 }
 
 function Invoke-SkillsAdd {
-    param([string[]]$AddArgs)
+    param(
+        [string[]]$AddArgs,
+        [switch]$DryRun
+    )
 
     $url = $null
     $force = $false
@@ -655,18 +774,24 @@ function Invoke-SkillsAdd {
             "--agents-only" { $agentsOnly = $true }
             "--claude-only" { $claudeOnly = $true }
             "--all" { $installAll = $true }
+            "--dry-run" { $DryRun = $true }
             "--help" {
                 Write-Host "USAGE:"
-                Write-Host "  .\dot.ps1 skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill NAME]"
+                Write-Host "  $SKILLS_ADD_USAGE"
                 Write-Host ""
                 Write-Host "  <url>  GitHub tree URL containing one skill or multiple skill directories"
                 Write-Host "         e.g. https://github.com/owner/repo/tree/main/skills"
+                Write-Host ""
+                Write-Host "  Prompts for which skills to install unless --all or --skill=NAME is given."
+                Write-Host ""
+                Write-Host "  --force  Replace skills that are already installed (asks first on an interactive terminal)"
+                Write-Host "  Branch names containing a slash must be percent-encoded (feature%2Fx)."
                 return 0
             }
             default {
                 if ($arg -eq "-h") {
                     Write-Host "USAGE:"
-                    Write-Host "  .\dot.ps1 skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill NAME]"
+                    Write-Host "  $SKILLS_ADD_USAGE"
                     return 0
                 }
                 elseif ($arg.StartsWith("--skill=")) {
@@ -692,7 +817,7 @@ function Invoke-SkillsAdd {
         throw "Options --agents-only and --claude-only are mutually exclusive"
     }
     if ([string]::IsNullOrWhiteSpace($url)) {
-        throw "Missing required <url>. Usage: .\dot.ps1 skills add <url> [--force]"
+        throw "Missing required <url>. Usage: $SKILLS_ADD_USAGE"
     }
     if ($installAll -and $wanted.Count -gt 0) {
         throw "Options --all and --skill cannot be combined"
@@ -734,6 +859,11 @@ function Invoke-SkillsAdd {
             throw "No skill directories (containing SKILL.md) found under $($tree.Path)"
         }
 
+        $descriptions = @{}
+        foreach ($skill in $skills) {
+            $descriptions[$skill.Name] = Get-SkillDescription -SkillDirectory $skill.FullName
+        }
+
         $selected = @()
         if ($wanted.Count -gt 0) {
             foreach ($name in $wanted) {
@@ -744,11 +874,12 @@ function Invoke-SkillsAdd {
                 $selected += $match[0]
             }
         }
-        elseif ($installAll -or $skills.Count -eq 1) {
+        elseif ($installAll) {
             $selected = $skills
         }
         else {
-            $selected = @(Select-SkillsInteractively -Skills $skills)
+            # Interactive is the default: --all and --skill= are the opt-outs.
+            $selected = @(Select-SkillsInteractively -Skills $skills -Descriptions $descriptions)
         }
 
         if ($selected.Count -eq 0) {
@@ -756,36 +887,76 @@ function Invoke-SkillsAdd {
             return 0
         }
 
+        # Resolve every target before writing anything, so a single confirmation
+        # can cover the whole run instead of one prompt per file.
+        $plan = New-Object System.Collections.Generic.List[object]
+        foreach ($skill in ($selected | Sort-Object -Property Name)) {
+            foreach ($dest in $destRoots) {
+                $target = Join-Path $dest.Root $skill.Name
+                $exists = Test-Path -LiteralPath $target
+                $action = if (-not $exists) { "install" } elseif ($force) { "replace" } else { "skip" }
+                [void]$plan.Add([pscustomobject]@{
+                    Skill = $skill
+                    Target = $target
+                    Qualified = "$($skill.Name) ($($dest.Label))"
+                    Exists = $exists
+                    Action = $action
+                })
+            }
+        }
+
+        $replaceCount = @($plan | Where-Object { $_.Action -eq "replace" }).Count
+        if ($replaceCount -gt 0 -and -not $DryRun) {
+            $confirmed = Confirm-DestructiveAction -Verb "Replace" -Count $replaceCount -Subject "skill"
+            if (-not $confirmed) {
+                Write-Info "Cancelled; nothing was installed."
+                return 0
+            }
+        }
+
         foreach ($dest in $destRoots) {
-            Ensure-Directory -Path $dest.Root
+            if (-not $DryRun) {
+                Ensure-Directory -Path $dest.Root
+            }
         }
 
         $installed = New-Object System.Collections.Generic.List[string]
         $skipped = New-Object System.Collections.Generic.List[string]
-        foreach ($skill in ($selected | Sort-Object -Property Name)) {
-            foreach ($dest in $destRoots) {
-                $target = Join-Path $dest.Root $skill.Name
-                $qualified = "$($skill.Name) ($($dest.Label))"
-                if (Test-Path -LiteralPath $target) {
-                    if (-not $force) {
-                        [void]$skipped.Add($qualified)
-                        continue
-                    }
-                    Remove-Item -LiteralPath $target -Recurse -Force
-                }
-                Copy-Item -LiteralPath $skill.FullName -Destination $target -Recurse -Force
-                [void]$installed.Add($qualified)
+        foreach ($entry in $plan) {
+            if ($entry.Action -eq "skip") {
+                [void]$skipped.Add($entry.Qualified)
+                continue
             }
+            if ($DryRun) {
+                Write-Info "Would $($entry.Action) $($entry.Target)"
+                [void]$installed.Add($entry.Qualified)
+                continue
+            }
+            if ($entry.Exists) {
+                Remove-Item -LiteralPath $entry.Target -Recurse -Force
+            }
+            Copy-Item -LiteralPath $entry.Skill.FullName -Destination $entry.Target -Recurse -Force
+            [void]$installed.Add($entry.Qualified)
         }
 
         if ($installed.Count -gt 0) {
-            Write-Success ("Installed {0}: {1}" -f $installed.Count, ($installed -join ", "))
+            if ($DryRun) {
+                Write-Success ("Dry run would install {0}: {1}" -f $installed.Count, ($installed -join ", "))
+            }
+            else {
+                Write-Success ("Installed {0}: {1}" -f $installed.Count, ($installed -join ", "))
+            }
         }
         if ($skipped.Count -gt 0) {
             Write-Warn ("Skipped {0} existing: {1}" -f $skipped.Count, ($skipped -join ", "))
             Write-Info "Run again with --force to replace them."
         }
-        Write-Info "Next: run '.\dot.ps1 sync' on Windows or './dot stow' on macOS to deploy to `$HOME."
+        if ($DryRun) {
+            Write-Info "No files were changed"
+        }
+        else {
+            Write-Info "Next: run '.\dot.ps1 sync' on Windows or './dot stow' on macOS to deploy to `$HOME."
+        }
         return 0
     }
     finally {
@@ -804,8 +975,9 @@ function Show-Help {
     Write-Host ""
     Write-Host "COMMANDS:"
     Write-Host "  sync      Sync top-level directories from home/ into `$HOME"
-    Write-Host "  skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill=NAME]"
+    Write-Host "  skills add <url> [--force] [--agents-only|--claude-only] [--all] [--dry-run] [--skill=NAME]"
     Write-Host "            Download skills from a GitHub tree URL into home/.agents/skills and home/.claude/skills"
+    Write-Host "            Prompts for which skills to install unless --all or --skill=NAME is given"
     Write-Host "  doctor    Run read-only diagnostics for managed sync paths"
     Write-Host "  orphans   List target paths that do not exist in home/"
     Write-Host "  prune     Pick installed skills that are not in home/ to delete"
@@ -813,7 +985,7 @@ function Show-Help {
     Write-Host ""
     Write-Host "OPTIONS:"
     Write-Host "  --dotfiles-dir PATH  Override dotfiles directory"
-    Write-Host "  --dry-run            Preview sync or prune without changing files"
+    Write-Host "  --dry-run            Preview sync, skills add, or prune without changing files"
     Write-Host "  --version            Show version information"
     Write-Host "  -h, --help           Show this help message"
     Write-Host ""
@@ -869,16 +1041,29 @@ function Main {
             }
         }
         "skills" {
-            if ($dryRun) {
-                throw "Option --dry-run is only valid with sync and prune"
+            # `skills` and `skills --help` on their own should print the skills add
+            # usage instead of a usage error, matching the other commands.
+            $subCommand = if ($commandArgs.Count -gt 0) { $commandArgs[0] } else { "" }
+            if ($subCommand -eq "" -or $subCommand -eq "-h" -or $subCommand -eq "--help") {
+                $commandArgs = @("add", "--help")
+                $showHelp = $false
             }
-            if ($commandArgs.Count -eq 0 -or $commandArgs[0] -ne "add") {
-                throw "Usage: .\dot.ps1 skills add <url> [--force] [--agents-only|--claude-only] [--all] [--skill=NAME]"
+            elseif ($showHelp) {
+                if ($subCommand -ne "add") {
+                    throw "Usage: $SKILLS_ADD_USAGE"
+                }
+                if ($commandArgs -notcontains "--help" -and $commandArgs -notcontains "-h") {
+                    $commandArgs += "--help"
+                }
+                $showHelp = $false
+            }
+            elseif ($subCommand -ne "add") {
+                throw "Usage: $SKILLS_ADD_USAGE"
             }
         }
         "doctor" {
             if ($dryRun) {
-                throw "Option --dry-run is only valid with sync and prune"
+                throw "Option --dry-run is only valid with sync, skills, and prune"
             }
             if ($commandArgs.Count -gt 0) {
                 throw "Unexpected argument for doctor: $($commandArgs[0])"
@@ -891,7 +1076,7 @@ function Main {
         }
         "orphans" {
             if ($dryRun) {
-                throw "Option --dry-run is only valid with sync and prune"
+                throw "Option --dry-run is only valid with sync, skills, and prune"
             }
             if ($commandArgs.Count -gt 0) {
                 throw "Unexpected argument for orphans: $($commandArgs[0])"
@@ -899,7 +1084,7 @@ function Main {
         }
         "help" {
             if ($dryRun) {
-                throw "Option --dry-run is only valid with sync and prune"
+                throw "Option --dry-run is only valid with sync, skills, and prune"
             }
             if ($commandArgs.Count -gt 0) {
                 throw "Unexpected argument for help: $($commandArgs[0])"
@@ -915,11 +1100,6 @@ function Main {
     if ($showVersion) {
         Write-Host "$SCRIPT_NAME version $VERSION"
         return 0
-    }
-
-    if ($command -eq "skills" -and $showHelp) {
-        $commandArgs += "--help"
-        $showHelp = $false
     }
 
     if ($showHelp -or $command -eq "help") {
@@ -939,7 +1119,7 @@ function Main {
                 $commandArgs[1..($commandArgs.Count - 1)]
             }
         )
-        return (Invoke-SkillsAdd -AddArgs $addArgs)
+        return (Invoke-SkillsAdd -AddArgs $addArgs -DryRun:$dryRun)
     }
 
     if ($command -eq "doctor") {
