@@ -250,6 +250,34 @@ function Write-OrphanTree {
     }
 }
 
+function Test-SyncPairReady {
+    param([Parameter(Mandatory)]$SyncPair)
+
+    if (-not (Test-Path -LiteralPath $SyncPair.Source -PathType Container)) {
+        Write-ErrorMsg "Source $($SyncPair.Label) missing: $($SyncPair.Source)"
+        return $false
+    }
+
+    if (-not (Test-Path -LiteralPath $SyncPair.Target)) {
+        Write-ErrorMsg "Target $($SyncPair.Label) missing: $($SyncPair.Target)"
+        return $false
+    }
+
+    if (-not (Test-Path -LiteralPath $SyncPair.Target -PathType Container)) {
+        Write-ErrorMsg "Target $($SyncPair.Label) is not a directory: $($SyncPair.Target)"
+        return $false
+    }
+
+    $targetItem = Get-Item -LiteralPath $SyncPair.Target -Force
+    $isReparsePoint = ($targetItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+    if ($isReparsePoint) {
+        Write-ErrorMsg "Target $($SyncPair.Label) is a reparse point: $($SyncPair.Target)"
+        return $false
+    }
+
+    return $true
+}
+
 function Invoke-Orphans {
     Write-Header "Finding orphaned managed home paths"
 
@@ -262,32 +290,12 @@ function Invoke-Orphans {
     $issues = 0
 
     foreach ($syncPair in $SYNC_PAIRS) {
-        if (-not (Test-Path -LiteralPath $syncPair.Source -PathType Container)) {
-            Write-ErrorMsg "Source $($syncPair.Label) missing: $($syncPair.Source)"
-            $issues++
-            continue
-        }
-
-        if (-not (Test-Path -LiteralPath $syncPair.Target)) {
-            Write-ErrorMsg "Target $($syncPair.Label) missing: $($syncPair.Target)"
-            $issues++
-            continue
-        }
-
-        if (-not (Test-Path -LiteralPath $syncPair.Target -PathType Container)) {
-            Write-ErrorMsg "Target $($syncPair.Label) is not a directory: $($syncPair.Target)"
+        if (-not (Test-SyncPairReady -SyncPair $syncPair)) {
             $issues++
             continue
         }
 
         $targetItem = Get-Item -LiteralPath $syncPair.Target -Force
-        $isReparsePoint = ($targetItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
-        if ($isReparsePoint) {
-            Write-ErrorMsg "Target $($syncPair.Label) is a reparse point: $($syncPair.Target)"
-            $issues++
-            continue
-        }
-
         $tree = New-OrphanNode
         $labelCount = 0
 
@@ -325,42 +333,190 @@ function Invoke-Orphans {
     return 0
 }
 
-function Get-StaleSkills {
-    $stale = @{}
+function Get-SkillSyncPairs {
+    # Without a usable HOME there is no installed target to clean up.
+    if ([string]::IsNullOrWhiteSpace($HOME)) {
+        return
+    }
 
     foreach ($relativePath in $SKILL_DIRS) {
         $source = Join-Path $DOTFILES_DIR "home/$relativePath"
         $target = Join-Path $HOME $relativePath
 
-        # Without a source there is nothing to compare against, and treating every
-        # installed skill as stale would offer to delete all of them.
+        # Without a source there is nothing to compare against, and without a
+        # target there is nothing installed to clean up.
         if (-not (Test-Path -LiteralPath $source -PathType Container) -or
             -not (Test-Path -LiteralPath $target -PathType Container)) {
             continue
         }
 
-        $managed = @(Get-ChildItem -LiteralPath $source -Directory -Force | ForEach-Object Name)
+        [pscustomobject]@{
+            Label = $relativePath.Split('/')[0]
+            Source = $source
+            Target = $target
+        }
+    }
+}
 
-        foreach ($dir in Get-ChildItem -LiteralPath $target -Directory -Force) {
-            # Dot-prefixed folders such as .trash are tool bookkeeping, not skills.
-            if ($dir.Name.StartsWith(".") -or $dir.Name -in $managed) {
-                continue
-            }
+function Group-OrphanCandidates {
+    param([Parameter(Mandatory)][object[]]$Candidates)
 
-            if (-not $stale.ContainsKey($dir.Name)) {
-                $stale[$dir.Name] = [pscustomobject]@{
-                    Name = $dir.Name
-                    Locations = New-Object System.Collections.Generic.List[string]
-                    Paths = New-Object System.Collections.Generic.List[string]
-                }
-            }
+    # One checkbox per relative path, with all orphaned copies behind it.
+    $Candidates | Group-Object -Property RelativePath | Sort-Object -Property Name | ForEach-Object {
+        [pscustomobject]@{
+            RelativePath = $_.Name
+            Candidates = $_.Group
+        }
+    }
+}
 
-            $stale[$dir.Name].Locations.Add($relativePath.Split('/')[0])
-            $stale[$dir.Name].Paths.Add($dir.FullName)
+function Get-EntryLabel {
+    param(
+        [Parameter(Mandatory)][int]$Width,
+        [Parameter(Mandatory)]$Entry
+    )
+
+    $locations = $Entry.Candidates.Label | Sort-Object -Unique
+
+    "$($Entry.RelativePath.PadRight($Width))  $($locations -join ' ')"
+}
+
+function Test-InteractiveHost {
+    # The picker needs a real console, so redirected stdin or stdout falls back
+    # to a static list instead of throwing or hanging in a pipeline.
+    return (-not [Console]::IsInputRedirected) -and (-not [Console]::IsOutputRedirected)
+}
+
+function Invoke-Clean {
+    param(
+        [switch]$DryRun,
+        [switch]$All
+    )
+
+    if ($All) {
+        Write-Header "Finding orphaned paths under managed home directories"
+
+        if (-not (Test-ManagedPaths)) {
+            return 1
+        }
+
+        $syncPairs = $SYNC_PAIRS
+    }
+    else {
+        Write-Header "Finding orphaned skills and stray skill files"
+
+        $syncPairs = @(Get-SkillSyncPairs)
+        if ($syncPairs.Count -eq 0) {
+            Write-Warn "No installed skill directories found"
+            Write-Info "Run 'sync' first, or use --all to scan every managed directory"
+            return 0
         }
     }
 
-    $stale.Values | Sort-Object -Property Name
+    $candidates = New-Object System.Collections.Generic.List[object]
+    $issues = 0
+
+    foreach ($syncPair in $syncPairs) {
+        if (-not (Test-SyncPairReady -SyncPair $syncPair)) {
+            $issues++
+            continue
+        }
+
+        $targetItem = Get-Item -LiteralPath $syncPair.Target -Force
+
+        foreach ($item in Get-OrphanItems -TargetRoot $targetItem.FullName -SourceRoot $syncPair.Source) {
+            # Dot-prefixed skill folders such as .trash are tool bookkeeping, not
+            # skills, so they are never offered for deletion.
+            if (-not $All -and ($item.RelativePath -split '[\\/]')[0].StartsWith(".")) {
+                continue
+            }
+
+            $candidates.Add([pscustomobject]@{
+                Label = $syncPair.Label
+                Source = $syncPair.Source
+                RelativePath = $item.RelativePath
+                Path = Join-Path $syncPair.Target $item.RelativePath
+            })
+        }
+    }
+
+    if ($issues -gt 0) {
+        Write-Header "Found $issues issue(s) while finding orphans"
+        return 1
+    }
+
+    if ($candidates.Count -eq 0) {
+        Write-Success "No orphaned paths found"
+        return 0
+    }
+
+    $entries = @(Group-OrphanCandidates -Candidates $candidates)
+    $width = ($entries | ForEach-Object { $_.RelativePath.Length } | Measure-Object -Maximum).Maximum
+    $labels = @($entries | ForEach-Object { Get-EntryLabel -Width $width -Entry $_ })
+
+    # --dry-run still opens the picker when there is a terminal, so you can mark
+    # rows freely and see what would go. Without a terminal it prints the list.
+    if (-not (Test-InteractiveHost)) {
+        Write-Warn "No terminal available; showing the list instead"
+        $labels | ForEach-Object { Write-Host "  $_" }
+        if ($DryRun) {
+            Write-Info "No files were deleted"
+        }
+        else {
+            Write-Info "No files were changed"
+        }
+        return 0
+    }
+
+    $chosen = @(Select-Items -Labels $labels)
+    if ($chosen.Count -eq 0) {
+        Write-Info "No files selected"
+        return 0
+    }
+
+    $count = 0
+
+    foreach ($index in $chosen) {
+        foreach ($candidate in $entries[$index].Candidates) {
+            # Re-check immediately before deleting: the path may have been removed,
+            # or may have gained a matching source since the list was built.
+            if (-not (Test-Path -LiteralPath $candidate.Path)) {
+                continue
+            }
+
+            if (Test-Path -LiteralPath (Join-Path $candidate.Source $candidate.RelativePath)) {
+                Write-Warn "Skipping, now managed by home/: $($candidate.Path)"
+                continue
+            }
+
+            if ($DryRun) {
+                Write-Host "  would delete $($candidate.Path)"
+            }
+            else {
+                $item = Get-Item -LiteralPath $candidate.Path -Force
+                $isReparsePoint = ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0
+
+                # Remove links directly; recurse only into real directories.
+                if ($item.PSIsContainer -and -not $isReparsePoint) {
+                    Remove-Item -LiteralPath $candidate.Path -Recurse -Force
+                }
+                else {
+                    Remove-Item -LiteralPath $candidate.Path -Force
+                }
+            }
+
+            $count++
+        }
+    }
+
+    if ($DryRun) {
+        Write-Info "Would delete $count path(s) from $($chosen.Count) selection(s)"
+        Write-Info "No files were deleted"
+    }
+    else {
+        Write-Success "Deleted $count orphaned path(s) from $($chosen.Count) selection(s)"
+    }
+    return 0
 }
 
 function Write-SelectionList {
@@ -438,46 +594,6 @@ function Select-Items {
             }
         }
     }
-}
-
-function Invoke-Prune {
-    param([switch]$DryRun)
-
-    Write-Header "Finding skills not in home/"
-
-    if (-not (Test-ManagedPaths)) {
-        return 1
-    }
-
-    $stale = @(Get-StaleSkills)
-    if ($stale.Count -eq 0) {
-        Write-Success "No stale skills found"
-        return 0
-    }
-
-    $width = ($stale | ForEach-Object { $_.Name.Length } | Measure-Object -Maximum).Maximum
-    $labels = @($stale | ForEach-Object { "$($_.Name.PadRight($width))  $($_.Locations -join ' ')" })
-
-    if ($DryRun) {
-        $labels | ForEach-Object { Write-Host "  $_" }
-        Write-Info "No files were deleted"
-        return 0
-    }
-
-    $chosen = @(Select-Items -Labels $labels)
-    if ($chosen.Count -eq 0) {
-        Write-Info "No skills deleted"
-        return 0
-    }
-
-    foreach ($index in $chosen) {
-        foreach ($path in $stale[$index].Paths) {
-            Remove-Item -LiteralPath $path -Recurse -Force
-        }
-    }
-
-    Write-Success "Deleted $($chosen.Count) skill(s)"
-    return 0
 }
 
 function Invoke-Doctor {
@@ -565,12 +681,13 @@ function Show-Help {
     Write-Host "  sync      Sync top-level directories from home/ into `$HOME"
     Write-Host "  doctor    Run read-only diagnostics for managed sync paths"
     Write-Host "  orphans   List target paths that do not exist in home/"
-    Write-Host "  prune     Pick installed skills that are not in home/ to delete"
+    Write-Host "  clean     Pick orphaned skills and stray skill files to delete"
     Write-Host "  help      Show this help message"
     Write-Host ""
     Write-Host "OPTIONS:"
     Write-Host "  --dotfiles-dir PATH  Override dotfiles directory"
-    Write-Host "  --dry-run            Preview sync or prune without changing files"
+    Write-Host "  --dry-run            Preview without changing files (clean still opens the picker)"
+    Write-Host "  --all                With clean, scan every managed directory instead of skills"
     Write-Host "  --version            Show version information"
     Write-Host "  -h, --help           Show this help message"
     Write-Host ""
@@ -581,6 +698,7 @@ function Main {
 
     $remaining = New-Object System.Collections.Generic.List[string]
     $dryRun = $false
+    $all = $false
     $showHelp = $false
     $showVersion = $false
 
@@ -599,6 +717,9 @@ function Main {
             }
             "--dry-run" {
                 $dryRun = $true
+            }
+            "--all" {
+                $all = $true
             }
             "-h" {
                 $showHelp = $true
@@ -619,39 +740,35 @@ function Main {
         }
     )
 
+    # Keep the old name working without a separate validation or execution path.
+    if ($command -eq "prune") {
+        Write-Warn "'prune' is now part of 'clean'; running clean instead"
+        $command = "clean"
+    }
+
     switch ($command) {
         "sync" {
+            if ($all) {
+                throw "Option --all is only valid with clean"
+            }
             foreach ($commandArg in $commandArgs) {
                 throw "Unknown option for sync: $commandArg"
             }
         }
-        "doctor" {
-            if ($dryRun) {
-                throw "Option --dry-run is only valid with sync and prune"
-            }
+        "clean" {
             if ($commandArgs.Count -gt 0) {
-                throw "Unexpected argument for doctor: $($commandArgs[0])"
+                throw "Unexpected argument for clean: $($commandArgs[0])"
             }
         }
-        "prune" {
-            if ($commandArgs.Count -gt 0) {
-                throw "Unexpected argument for prune: $($commandArgs[0])"
-            }
-        }
-        "orphans" {
+        { $_ -in @("doctor", "orphans", "help") } {
             if ($dryRun) {
-                throw "Option --dry-run is only valid with sync and prune"
+                throw "Option --dry-run is only valid with sync and clean"
+            }
+            if ($all) {
+                throw "Option --all is only valid with clean"
             }
             if ($commandArgs.Count -gt 0) {
-                throw "Unexpected argument for orphans: $($commandArgs[0])"
-            }
-        }
-        "help" {
-            if ($dryRun) {
-                throw "Option --dry-run is only valid with sync and prune"
-            }
-            if ($commandArgs.Count -gt 0) {
-                throw "Unexpected argument for help: $($commandArgs[0])"
+                throw "Unexpected argument for ${command}: $($commandArgs[0])"
             }
         }
         default {
@@ -681,8 +798,8 @@ function Main {
         return (Invoke-Doctor)
     }
 
-    if ($command -eq "prune") {
-        return (Invoke-Prune -DryRun:$dryRun)
+    if ($command -eq "clean") {
+        return (Invoke-Clean -DryRun:$dryRun -All:$all)
     }
 
     return (Invoke-Orphans)

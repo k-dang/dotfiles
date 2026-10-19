@@ -195,76 +195,161 @@ cmd_stow() {
     stow_dotfiles routine
 }
 
-# A skill is stale when it is installed under $HOME but missing from home/. Without
-# a source directory there is nothing to compare against, so nothing is stale.
-is_stale_skill() {
+# A path is orphaned when it is installed under $HOME but missing from home/.
+# Dangling symlinks count as installed: stow leaves a deleted source behind as a
+# link, and -e alone would miss it. Without a source directory there is nothing
+# to compare against, so nothing is orphaned.
+is_orphaned_path() {
     local source="${DOTFILES_DIR}/home/$1"
-    [[ -d "$source" && -e "${HOME}/$1/$2" && ! -e "${source}/$2" ]]
+    [[ -d "$source" && ( -e "${HOME}/$1/$2" || -L "${HOME}/$1/$2" ) && ! -e "${source}/$2" ]]
 }
 
-# Prints one line per stale skill: the name padded to a column, then the
-# top-level directories (.claude, .agents) it is installed in.
-list_stale_skills() {
-    local rel dir name
+# Prints one orphaned path per line as "relative/path<TAB>location". Reports the
+# topmost orphan only: everything under an orphaned directory is orphaned too, so
+# descending adds no information (caches and node_modules run to thousands of
+# entries).
+#
+# $1 = source root, $2 = target root, $3 = skills root (for the location column),
+# $4 = directory to walk.
+walk_orphans() {
+    local source_root="$1" target_root="$2" rel="$3" dir="$4"
+    local item relative
+
+    # The dot globs reach hidden entries without matching . and ..
+    for item in "$dir"/* "$dir"/.[!.]* "$dir"/..?*; do
+        if [[ ! -e "$item" && ! -L "$item" ]]; then
+            continue
+        fi
+
+        relative="${item#"$target_root"/}"
+
+        # Dot-prefixed entries such as .trash are tool bookkeeping, not skills.
+        if [[ "$relative" == .* ]]; then
+            continue
+        fi
+
+        if [[ ! -e "${source_root}/${relative}" ]]; then
+            printf "%s\t%s\n" "$relative" "${rel%%/*}"
+            continue
+        fi
+
+        # Symlinks are treated as leaves so a link into a huge tree cannot pull
+        # the walk outside the managed directories.
+        if [[ -d "$item" && ! -L "$item" ]]; then
+            walk_orphans "$source_root" "$target_root" "$rel" "$item"
+        fi
+    done
+}
+
+# Prints one line per orphaned skill path: the path padded to a column, then the
+# top-level directories (.claude, .agents) it is orphaned in.
+list_orphans() {
+    local rel
     for rel in "${SKILL_DIRS[@]}"; do
-        # The glob skips dot-prefixed folders such as .trash, which are not skills.
-        for dir in "${HOME}/${rel}"/*/; do
-            name="$(basename "$dir")"
-            if is_stale_skill "$rel" "$name"; then
-                printf "%s\t%s\n" "$name" "${rel%%/*}"
-            fi
-        done
+        # Without both ends there is nothing to compare, and treating every
+        # installed path as orphaned would offer to delete all of them.
+        [[ -d "${DOTFILES_DIR}/home/${rel}" && -d "${HOME}/${rel}" ]] || continue
+        walk_orphans "${DOTFILES_DIR}/home/${rel}" "${HOME}/${rel}" "$rel" "${HOME}/${rel}"
     done | sort | awk -F'\t' '
-        !($1 in locations) { names[n++] = $1; locations[$1] = $2; if (length($1) > width) width = length($1); next }
+        !($1 in locations) { paths[n++] = $1; locations[$1] = $2; if (length($1) > width) width = length($1); next }
         { locations[$1] = locations[$1] " " $2 }
-        END { for (i = 0; i < n; i++) printf "%-" width "s  %s\n", names[i], locations[names[i]] }
+        END { for (i = 0; i < n; i++) printf "%-" width "s  %s\n", paths[i], locations[paths[i]] }
     '
 }
 
-cmd_prune() {
+# The picker needs a real terminal, so redirected stdin or stdout falls back to a
+# static list instead of failing inside gum.
+can_prompt() {
+    [[ -t 0 && -t 1 ]]
+}
+
+cmd_clean() {
     local dry_run=false
     case "${1:-}" in
         "") ;;
         --dry-run) dry_run=true ;;
-        *) die "Unexpected argument for prune: $1" ;;
+        *) die "Unexpected argument for clean: $1" ;;
     esac
+    if [[ $# -gt 1 ]]; then
+        die "Unexpected argument for clean: $2"
+    fi
 
-    print_header "Finding skills not in home/"
+    print_header "Finding orphaned skills and stray skill files"
 
-    local stale
-    stale="$(list_stale_skills)"
-    if [[ -z "$stale" ]]; then
-        print_success "No stale skills found"
+    local orphans
+    orphans="$(list_orphans)"
+    if [[ -z "$orphans" ]]; then
+        print_success "No orphaned paths found"
         return 0
     fi
 
+    # Dry runs keep the picker, but can fall back to a list without gum.
+    # Without a terminal, neither mode may delete anything.
+    local fallback_reason=""
+    if ! can_prompt; then
+        fallback_reason="No terminal available"
+    elif ! command_exists gum; then
+        $dry_run || die "gum not found. Install it with: brew install gum"
+        fallback_reason="gum not found"
+    fi
+
+    if [[ -n "$fallback_reason" ]]; then
+        printf "%s\n" "$orphans" | sed 's/^/  /'
+        print_warning "${fallback_reason}; showing the list instead"
+        if $dry_run; then
+            print_info "No files were deleted"
+        else
+            print_info "No files were changed"
+        fi
+        return 0
+    fi
+
+    local header="Select orphaned paths to delete"
     if $dry_run; then
-        printf "%s\n" "$stale" | sed 's/^/  /'
+        header="Select orphaned paths to preview"
+    fi
+
+    local chosen
+    chosen="$(printf "%s\n" "$orphans" | gum choose --no-limit --header "$header")" || true
+    if [[ -z "$chosen" ]]; then
+        print_info "No files selected"
+        return 0
+    fi
+
+    local count=0 label path rel target
+    while IFS= read -r label; do
+        # Strip the location column and padding, not spaces inside the path.
+        path="${label%  .*}"
+        path="${path%"${path##*[! ]}"}"
+        for rel in "${SKILL_DIRS[@]}"; do
+            # Re-check right before deleting: the path may have gained a matching
+            # source since the list was built.
+            is_orphaned_path "$rel" "$path" || continue
+            target="${HOME:?}/${rel}/${path}"
+
+            if $dry_run; then
+                printf '  would delete %s\n' "$target"
+            else
+                # rm removes a symlink itself, never what it points at.
+                rm -rf "$target"
+            fi
+            ((++count))
+        done
+    done <<<"$chosen"
+
+    if $dry_run; then
+        print_info "Would delete ${count} path(s)"
         print_info "No files were deleted"
         return 0
     fi
 
-    command_exists gum || die "gum not found. Install it with: brew install gum"
+    print_success "Deleted ${count} orphaned path(s)"
+}
 
-    local chosen
-    chosen="$(printf "%s\n" "$stale" | gum choose --no-limit --header "Select skills to delete")" || true
-    if [[ -z "$chosen" ]]; then
-        print_info "No skills deleted"
-        return 0
-    fi
-
-    local count=0 label name rel
-    while IFS= read -r label; do
-        name="${label%% *}"
-        for rel in "${SKILL_DIRS[@]}"; do
-            if is_stale_skill "$rel" "$name"; then
-                rm -rf "${HOME:?}/${rel}/${name}"
-            fi
-        done
-        ((++count))
-    done <<<"$chosen"
-
-    print_success "Deleted ${count} skill(s)"
+# Backward-compatible alias for the broader cleanup command.
+cmd_prune() {
+    print_warning "'prune' is now part of 'clean'; running clean instead"
+    cmd_clean "$@"
 }
 
 cmd_help() {
@@ -278,11 +363,12 @@ cmd_help() {
     printf "    init                Initialize dotfiles without adopting existing config files\n"
     printf "    doctor              Run diagnostics and check installation\n"
     printf "    stow                Create symlinks for dotfiles using GNU Stow\n"
-    printf "    prune [--dry-run]   Pick installed skills that are not in home/ to delete\n"
+    printf "    clean [--dry-run]   Pick orphaned skills and stray skill files to delete\n"
     printf "    help                Show this help message (default)\n\n"
 
     printf "${BOLD}OPTIONS:${RESET}\n"
     printf "    --dotfiles-dir PATH  Override dotfiles directory (default: script location)\n"
+    printf "    --dry-run            Preview without changing files; clean still opens the picker\n"
     printf "    --version            Show version information\n"
     printf "    -h, --help           Show this help message\n\n"
 
@@ -325,6 +411,9 @@ main() {
             ;;
         stow)
             cmd_stow "$@"
+            ;;
+        clean)
+            cmd_clean "$@"
             ;;
         prune)
             cmd_prune "$@"

@@ -92,7 +92,7 @@ Dotfiles management ships as two CLIs with different responsibilities per platfo
 dot init                 # Install tools, non-destructive initial stow, configure shell, chmod bin/ scripts
 dot doctor               # Check dependencies and configuration
 dot stow                 # Restow ~/.config symlinks after editing files under home/
-dot prune                # Pick installed skills that no longer exist in home/ and delete them
+dot clean                # Pick orphaned skills and stray skill files to delete
 dot help                 # Show help
 ```
 
@@ -102,9 +102,15 @@ dot help                 # Show help
 
 If `dot init` finds an existing real file that conflicts with a managed path under `home/`, it fails fast and leaves that file untouched.
 
-`dot prune` works like `dot.ps1 prune` (see below) but uses `gum choose` for the selection. Stow does not remove symlinks for files deleted from `home/`, so removed skills linger as folders of dangling links until pruned. `--dry-run` lists them without deleting.
+`dot clean` compares `~/.claude/skills` and `~/.agents/skills` with their respective directories under `home/`. It finds whole skills that are no longer managed, plus stray files and directories inside retained skills. An orphaned directory is listed once, not expanded into its contents. Paths orphaned in both locations share one checkbox; selecting it removes both orphaned copies. Top-level dot-prefixed entries such as `.trash` are excluded.
 
-Options: `--dotfiles-dir PATH`, `--version`, `-h`/`--help`.
+Selection uses [`gum choose`](https://github.com/charmbracelet/gum?tab=readme-ov-file#choose) with multiple selections enabled; enter confirms. `--dry-run` opens the same picker but only prints the full paths it would delete. Without a terminal, cleanup only lists candidates and changes nothing. If `gum` is missing, dry-run falls back to a list; normal interactive cleanup asks you to install it.
+
+Stow can leave dangling links after source files are removed. Cleanup includes these links and removes the links themselves, not their targets. Each selected path is rechecked against `home/` before deletion. Missing source or installed skill roots are skipped.
+
+`prune` remains a compatibility alias for `clean`. PowerShell provides the same default cleanup, plus `--all` to scan every managed directory.
+
+Options: `--dotfiles-dir PATH`, `--dry-run` (clean), `--version`, `-h`/`--help`.
 
 ### Windows: `dot.ps1`
 
@@ -112,7 +118,8 @@ Options: `--dotfiles-dir PATH`, `--version`, `-h`/`--help`.
 dot.ps1 sync              # Copy each top-level directory under home/ into $HOME
 dot.ps1 doctor            # Check that each home/ directory has been synced to $HOME
 dot.ps1 orphans           # List target paths under $HOME that no longer exist in home/
-dot.ps1 prune             # Pick installed skills that no longer exist in home/ and delete them
+dot.ps1 clean             # Pick orphaned skills and stray skill files to delete
+dot.ps1 clean --all       # Pick orphaned paths under any managed directory
 dot.ps1 help              # Show help
 ```
 
@@ -120,9 +127,13 @@ Windows has no `stow` equivalent, so `dot.ps1 sync` copies rather than symlinks:
 
 `dot.ps1 orphans` prints a tree per managed directory of target paths with no matching source under `home/`. It reports the topmost unmatched path only - an orphaned directory is listed once rather than expanded into its whole subtree. It does not delete anything or compare file contents.
 
-`dot.ps1 prune` compares `~/.claude/skills` and `~/.agents/skills` with their `home/` counterparts and opens a checkbox list of skill folders that are installed but no longer managed (arrow keys move, space toggles, `a` toggles all, enter deletes, esc cancels). A skill in both folders is one entry and is deleted from both. `sync` itself never deletes.
+`dot.ps1 clean` uses the same skill-scoped comparison, grouping, and exclusions as `dot clean` above. Its built-in checkbox picker uses arrow keys to move, space to toggle, `a` to toggle all, enter to confirm, and esc to cancel. `--dry-run` keeps the picker but reports `would delete <path>` instead of deleting. Redirecting stdin or stdout produces a static candidate list without changing files.
 
-Options: `--dotfiles-dir PATH`, `--dry-run` (sync and prune; preview without changing files), `--version`, `-h`/`--help`.
+`--all` expands cleanup to every top-level directory managed under `home/`, including dot-prefixed entries. Review these selections carefully: runtime state, caches, and machine-specific files are candidates whenever they have no matching repo path. Cleanup does not compare file contents. Selected paths are rechecked against `home/` before deletion, and symlinks are removed without following their targets.
+
+`prune` remains a compatibility alias for `clean`. `sync` itself never deletes.
+
+Options: `--dotfiles-dir PATH`, `--dry-run` (sync previews copies; clean opens the picker but deletes nothing, and prints a static list when redirected), `--all` (clean; scan every managed directory instead of just skills), `--version`, `-h`/`--help`.
 
 ### Typical usage
 
@@ -168,6 +179,20 @@ $HOME\dotfiles\dot.ps1 sync
 You can run `~/dotfiles/dot help` or `$HOME\dotfiles\dot.ps1 help` at any time to see the current command list.
 
 ## Verification
+
+### Cleanup regression tests
+
+From the repo root, run the suite for the CLI you are changing:
+
+```bash
+bash tests/dot-clean.sh
+```
+
+```powershell
+pwsh -NoProfile -File tests/dot-clean.ps1
+```
+
+Both suites use temporary home directories and mocked picker selections; they never clean your real home directory. Link checks are skipped if the platform cannot create links.
 
 ### macOS
 
