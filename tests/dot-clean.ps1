@@ -1,5 +1,4 @@
 #!/usr/bin/env pwsh
-# Standalone regression suite; imports definitions only, never production startup.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -31,7 +30,6 @@ function Put-File {
     [IO.File]::WriteAllText($Path, 'fixture')
 }
 function Get-Snapshot {
-    # Include directories as well as files; no links are present in these cases.
     (Get-ChildItem -LiteralPath $HOME -Force -Recurse | Sort-Object FullName |
         ForEach-Object { $_.FullName }) -join "`n"
 }
@@ -112,7 +110,6 @@ try {
     $script:SCRIPT_NAME = 'dot'
     $script:VERSION = 'test'
 
-    # Mock only the terminal boundary, retaining real scanning/grouping/deletion.
     function Test-InteractiveHost { return $script:Interactive }
     function Select-Items {
         param([string[]]$Labels)

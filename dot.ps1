@@ -334,7 +334,6 @@ function Invoke-Orphans {
 }
 
 function Get-SkillSyncPairs {
-    # Without a usable HOME there is no installed target to clean up.
     if ([string]::IsNullOrWhiteSpace($HOME)) {
         return
     }
@@ -343,8 +342,6 @@ function Get-SkillSyncPairs {
         $source = Join-Path $DOTFILES_DIR "home/$relativePath"
         $target = Join-Path $HOME $relativePath
 
-        # Without a source there is nothing to compare against, and without a
-        # target there is nothing installed to clean up.
         if (-not (Test-Path -LiteralPath $source -PathType Container) -or
             -not (Test-Path -LiteralPath $target -PathType Container)) {
             continue
@@ -358,32 +355,7 @@ function Get-SkillSyncPairs {
     }
 }
 
-function Group-OrphanCandidates {
-    param([Parameter(Mandatory)][object[]]$Candidates)
-
-    # One checkbox per relative path, with all orphaned copies behind it.
-    $Candidates | Group-Object -Property RelativePath | Sort-Object -Property Name | ForEach-Object {
-        [pscustomobject]@{
-            RelativePath = $_.Name
-            Candidates = $_.Group
-        }
-    }
-}
-
-function Get-EntryLabel {
-    param(
-        [Parameter(Mandatory)][int]$Width,
-        [Parameter(Mandatory)]$Entry
-    )
-
-    $locations = $Entry.Candidates.Label | Sort-Object -Unique
-
-    "$($Entry.RelativePath.PadRight($Width))  $($locations -join ' ')"
-}
-
 function Test-InteractiveHost {
-    # The picker needs a real console, so redirected stdin or stdout falls back
-    # to a static list instead of throwing or hanging in a pipeline.
     return (-not [Console]::IsInputRedirected) -and (-not [Console]::IsOutputRedirected)
 }
 
@@ -425,8 +397,7 @@ function Invoke-Clean {
         $targetItem = Get-Item -LiteralPath $syncPair.Target -Force
 
         foreach ($item in Get-OrphanItems -TargetRoot $targetItem.FullName -SourceRoot $syncPair.Source) {
-            # Dot-prefixed skill folders such as .trash are tool bookkeeping, not
-            # skills, so they are never offered for deletion.
+            # Exclude skill bookkeeping such as .trash unless --all was requested.
             if (-not $All -and ($item.RelativePath -split '[\\/]')[0].StartsWith(".")) {
                 continue
             }
@@ -450,12 +421,13 @@ function Invoke-Clean {
         return 0
     }
 
-    $entries = @(Group-OrphanCandidates -Candidates $candidates)
-    $width = ($entries | ForEach-Object { $_.RelativePath.Length } | Measure-Object -Maximum).Maximum
-    $labels = @($entries | ForEach-Object { Get-EntryLabel -Width $width -Entry $_ })
+    $entries = @($candidates | Group-Object -Property RelativePath | Sort-Object -Property Name)
+    $width = ($entries | ForEach-Object { $_.Name.Length } | Measure-Object -Maximum).Maximum
+    $labels = @($entries | ForEach-Object {
+        $locations = $_.Group.Label | Sort-Object -Unique
+        "$($_.Name.PadRight($width))  $($locations -join ' ')"
+    })
 
-    # --dry-run still opens the picker when there is a terminal, so you can mark
-    # rows freely and see what would go. Without a terminal it prints the list.
     if (-not (Test-InteractiveHost)) {
         Write-Warn "No terminal available; showing the list instead"
         $labels | ForEach-Object { Write-Host "  $_" }
@@ -477,9 +449,8 @@ function Invoke-Clean {
     $count = 0
 
     foreach ($index in $chosen) {
-        foreach ($candidate in $entries[$index].Candidates) {
-            # Re-check immediately before deleting: the path may have been removed,
-            # or may have gained a matching source since the list was built.
+        foreach ($candidate in $entries[$index].Group) {
+            # Sources and targets may have changed while the picker was open.
             if (-not (Test-Path -LiteralPath $candidate.Path)) {
                 continue
             }
@@ -740,7 +711,6 @@ function Main {
         }
     )
 
-    # Keep the old name working without a separate validation or execution path.
     if ($command -eq "prune") {
         Write-Warn "'prune' is now part of 'clean'; running clean instead"
         $command = "clean"

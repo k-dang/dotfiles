@@ -195,22 +195,14 @@ cmd_stow() {
     stow_dotfiles routine
 }
 
-# A path is orphaned when it is installed under $HOME but missing from home/.
-# Dangling symlinks count as installed: stow leaves a deleted source behind as a
-# link, and -e alone would miss it. Without a source directory there is nothing
-# to compare against, so nothing is orphaned.
+# Include dangling stow links, which -e alone would miss.
 is_orphaned_path() {
     local source="${DOTFILES_DIR}/home/$1"
     [[ -d "$source" && ( -e "${HOME}/$1/$2" || -L "${HOME}/$1/$2" ) && ! -e "${source}/$2" ]]
 }
 
-# Prints one orphaned path per line as "relative/path<TAB>location". Reports the
-# topmost orphan only: everything under an orphaned directory is orphaned too, so
-# descending adds no information (caches and node_modules run to thousands of
-# entries).
-#
-# $1 = source root, $2 = target root, $3 = skills root (for the location column),
-# $4 = directory to walk.
+# Emit topmost orphans as "relative/path<TAB>location".
+# Arguments: source root, target root, skills root, directory to walk.
 walk_orphans() {
     local source_root="$1" target_root="$2" rel="$3" dir="$4"
     local item relative
@@ -233,8 +225,7 @@ walk_orphans() {
             continue
         fi
 
-        # Symlinks are treated as leaves so a link into a huge tree cannot pull
-        # the walk outside the managed directories.
+        # Don't follow links outside the managed tree.
         if [[ -d "$item" && ! -L "$item" ]]; then
             walk_orphans "$source_root" "$target_root" "$rel" "$item"
         fi
@@ -246,8 +237,6 @@ walk_orphans() {
 list_orphans() {
     local rel
     for rel in "${SKILL_DIRS[@]}"; do
-        # Without both ends there is nothing to compare, and treating every
-        # installed path as orphaned would offer to delete all of them.
         [[ -d "${DOTFILES_DIR}/home/${rel}" && -d "${HOME}/${rel}" ]] || continue
         walk_orphans "${DOTFILES_DIR}/home/${rel}" "${HOME}/${rel}" "$rel" "${HOME}/${rel}"
     done | sort | awk -F'\t' '
@@ -257,8 +246,6 @@ list_orphans() {
     '
 }
 
-# The picker needs a real terminal, so redirected stdin or stdout falls back to a
-# static list instead of failing inside gum.
 can_prompt() {
     [[ -t 0 && -t 1 ]]
 }
@@ -322,15 +309,13 @@ cmd_clean() {
         path="${label%  .*}"
         path="${path%"${path##*[! ]}"}"
         for rel in "${SKILL_DIRS[@]}"; do
-            # Re-check right before deleting: the path may have gained a matching
-            # source since the list was built.
+            # Sources and targets may have changed while the picker was open.
             is_orphaned_path "$rel" "$path" || continue
             target="${HOME:?}/${rel}/${path}"
 
             if $dry_run; then
                 printf '  would delete %s\n' "$target"
             else
-                # rm removes a symlink itself, never what it points at.
                 rm -rf "$target"
             fi
             ((++count))
@@ -346,7 +331,6 @@ cmd_clean() {
     print_success "Deleted ${count} orphaned path(s)"
 }
 
-# Backward-compatible alias for the broader cleanup command.
 cmd_prune() {
     print_warning "'prune' is now part of 'clean'; running clean instead"
     cmd_clean "$@"

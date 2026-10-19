@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Standalone regression suite; never run clean against the caller's HOME.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/dot-clean.XXXXXX")"
@@ -44,13 +43,10 @@ fixture() {
     can_prompt() { return 0; }
 }
 
-# Select actual offered fixture rows, not fabricated labels. Command substitution
-# runs gum in a subshell, so race hooks communicate through the filesystem.
+# gum runs in a command-substitution subshell; recheck hooks must write to disk.
 gum() {
-    [[ "$1" == choose ]] || return 2
     local rows row wanted
     rows="$(< /dev/stdin)"
-    printf '%s\n' "$rows" > "$tmp/offered"
     if $CANCEL; then return 130; fi
     if [[ -n "$RECHECK_SOURCE" ]]; then put "$RECHECK_SOURCE"; fi
     while IFS= read -r row; do
@@ -160,12 +156,12 @@ test_noninteractive_cli() {
     local before output command
     before="$(snapshot)"
     for command in clean prune; do
-        output="$(HOME="$HOME" bash "$tmp/dot" --dotfiles-dir "$DOTFILES_DIR" "$command" </dev/null)"
+        output="$(bash "$tmp/dot" --dotfiles-dir "$DOTFILES_DIR" "$command" </dev/null)"
         assert_has "$output" 'showing the list instead'
         assert_has "$output" 'live/extra file.txt'
         [[ "$(snapshot)" == "$before" ]] || fail "$command noninteractive deleted files"
     done
-    output="$(HOME="$HOME" bash "$tmp/dot" --dotfiles-dir "$DOTFILES_DIR" clean --dry-run </dev/null)"
+    output="$(bash "$tmp/dot" --dotfiles-dir "$DOTFILES_DIR" clean --dry-run </dev/null)"
     assert_has "$output" 'No files were deleted'
     [[ "$(snapshot)" == "$before" ]] || fail 'noninteractive dry-run changed files'
 }
@@ -191,12 +187,12 @@ test_invalid_arguments() {
     local before output flag
     before="$(snapshot)"
     for flag in --unexpected --all; do
-        if output="$(HOME="$HOME" bash "$tmp/dot" --dotfiles-dir "$DOTFILES_DIR" clean --dry-run "$flag" 2>&1 </dev/null)"; then
+        if output="$(bash "$tmp/dot" --dotfiles-dir "$DOTFILES_DIR" clean --dry-run "$flag" 2>&1 </dev/null)"; then
             fail "clean --dry-run $flag should fail"
         fi
         assert_has "$output" "Unexpected argument for clean: $flag"
     done
-    if output="$(HOME="$HOME" bash "$tmp/dot" --dotfiles-dir "$DOTFILES_DIR" clean --all 2>&1 </dev/null)"; then
+    if output="$(bash "$tmp/dot" --dotfiles-dir "$DOTFILES_DIR" clean --all 2>&1 </dev/null)"; then
         fail 'Bash clean --all should fail'
     fi
     assert_has "$output" 'Unexpected argument for clean: --all'
