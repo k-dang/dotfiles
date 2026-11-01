@@ -20,22 +20,8 @@ if [ -f "$DOTFILES_PATH/modules/tools.sh" ]; then
 	source "$DOTFILES_PATH/modules/tools.sh"
 fi
 
-# Setup GNU stow for ~/.config management (optional)
-if command -v stow &>/dev/null; then
-	echo "Setting up GNU stow for ~/.config..."
-
-	# Run stow from dotfiles directory
-	cd "$DOTFILES_PATH"
-	if stow --target="$HOME" --no-folding home 2>/dev/null; then
-		echo "✓ Successfully stowed ~/.config"
-	else
-		echo "⚠️  Warning: stow command failed. You may need to manually manage ~/.config"
-	fi
-else
-	echo "⚠️  GNU stow not found. Skipping ~/.config symlink management."
-	echo "   Install stow for automatic ~/.config management: brew install stow"
-	echo "   Or manually copy files from $DOTFILES_PATH/home/.config/ to ~/.config/"
-fi
+# Use the CLI so bootstrap also creates Claude's shared skills link.
+bash "$DOTFILES_PATH/dot" stow
 
 # Ensure .zshrc sources dotfiles
 DOTFILES_LINE='source "$HOME/dotfiles/shell/zsh.sh"'

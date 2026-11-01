@@ -67,7 +67,7 @@ dotfiles/
 ├── home/                    # Files synced/stowed into $HOME
 │   ├── .config/               # Stowed into ~/.config on macOS/Linux (git, opencode, ...)
 │   ├── .agents/               # Copied to $HOME\.agents on Windows (skills)
-│   ├── .claude/                # Copied to $HOME\.claude on Windows (skills, agents)
+│   ├── .claude/                # Copied to $HOME\.claude on Windows (agents, skill variants, config)
 │   ├── .cursor/                 # Copied to $HOME\.cursor on Windows (agents, commands, skills)
 │   └── .pi/                     # Copied to $HOME\.pi on Windows (agent extensions)
 └── README.md
@@ -89,20 +89,22 @@ Dotfiles management ships as two CLIs with different responsibilities per platfo
 ### macOS / Linux: `dot`
 
 ```bash
-dot init                 # Install tools, non-destructive initial stow, configure shell, chmod bin/ scripts
+dot init                 # Install tools, initial stow, configure shell, chmod bin/ scripts
 dot doctor               # Check dependencies and configuration
 dot stow                 # Restow ~/.config symlinks after editing files under home/
 dot clean                # Pick orphaned skills and stray skill files to delete
 dot help                 # Show help
 ```
 
-`dot init` is the first-run command. It installs tools, performs a non-destructive initial stow (using GNU Stow), configures `~/.zshrc`, and makes scripts in `bin/` executable.
+`dot init` is the first-run command. It installs tools, performs an initial stow (using GNU Stow), configures `~/.zshrc`, and makes scripts in `bin/` executable.
 
 `dot stow` is the safe repeat command. It uses `stow --restow` so rerunning it reconciles managed symlinks already managed by stow.
 
-If `dot init` finds an existing real file that conflicts with a managed path under `home/`, it fails fast and leaves that file untouched.
+Shared skills live in `home/.agents/skills/`. The repository contains relative symlinks at `home/.claude/skills/<name>` pointing to `../../.agents/skills/<name>`, so they can be browsed before installation. GNU Stow installs these links normally. The real directories `home/.claude/skills/arena` and `interrogate` contain intentional Claude-specific versions. `dot init` and `dot stow` delete existing copied shared-skill directories before replacing them with links. Repeated runs keep valid shared links. Unmanaged local skills stay in place.
 
-`dot clean` compares `~/.claude/skills` and `~/.agents/skills` with their respective directories under `home/`. It finds whole skills that are no longer managed, plus stray files and directories inside retained skills. An orphaned directory is listed once, not expanded into its contents. Paths orphaned in both locations share one checkbox; selecting it removes both orphaned copies. Top-level dot-prefixed entries such as `.trash` are excluded.
+After replacing copied shared skills, remaining conflicts between existing real files and managed paths under `home/` are left for manual resolution.
+
+`dot clean` compares installed `.agents` skills and Claude-specific variants with their sources under `home/`. Shared Claude skills are excluded from the Claude scan, so cleanup scans each shared skill once. It finds whole skills that are no longer managed, plus stray files and directories inside retained skills. An orphaned directory is listed once, not expanded into its contents. Top-level dot-prefixed entries such as `.trash` are excluded.
 
 Selection uses [`gum choose`](https://github.com/charmbracelet/gum?tab=readme-ov-file#choose) with multiple selections enabled; enter confirms. `--dry-run` opens the same picker but only prints the full paths it would delete. Without a terminal, cleanup only lists candidates and changes nothing. If `gum` is missing, dry-run falls back to a list; normal interactive cleanup asks you to install it.
 
@@ -125,13 +127,15 @@ dot.ps1 help              # Show help
 
 Windows has no `stow` equivalent, so `dot.ps1 sync` copies rather than symlinks: it scans every top-level directory under `home/` (currently `.agents`, `.claude`, `.config`, `.cursor`, `.pi`) and copies it to the matching path under `$HOME`, e.g. `home/.claude` -> `$HOME\.claude`.
 
+Shared skills are the exception: sync creates a directory junction for each shared skill from `$HOME\.claude\skills\<name>` to `$HOME\.agents\skills\<name>`. Claude-specific versions under `home/.claude/skills/` are copied normally. Junctions work without administrator access or Developer Mode. Git may check out the repository symlinks as plain files when `core.symlinks=false`; sync handles both forms and never copies the placeholder files into Claude's installed skills. To browse repository links on Windows, use a checkout with `core.symlinks=true` and permission to create symlinks. Existing shared-skill copies or incorrect links are deleted and replaced directly. `--dry-run` previews the migration. Cleanup and orphan reporting exclude shared Claude skills, including with `--all`, while checking Claude-specific variants normally.
+
 `dot.ps1 orphans` prints a tree per managed directory of target paths with no matching source under `home/`. It reports the topmost unmatched path only - an orphaned directory is listed once rather than expanded into its whole subtree. It does not delete anything or compare file contents.
 
 `dot.ps1 clean` uses the same skill-scoped comparison, grouping, and exclusions as `dot clean` above. Its built-in checkbox picker uses arrow keys to move, space to toggle, `a` to toggle all, enter to confirm, and esc to cancel. `--dry-run` keeps the picker but reports `would delete <path>` instead of deleting. Redirecting stdin or stdout produces a static candidate list without changing files.
 
 `--all` expands cleanup to every top-level directory managed under `home/`, including dot-prefixed entries. Review these selections carefully: runtime state, caches, and machine-specific files are candidates whenever they have no matching repo path. Cleanup does not compare file contents. Selected paths are rechecked against `home/` before deletion, and symlinks are removed without following their targets.
 
-`prune` remains a compatibility alias for `clean`. `sync` itself never deletes.
+`prune` remains a compatibility alias for `clean`. `sync` preserves extra files outside shared Claude skill directories, which are replaced with links.
 
 Options: `--dotfiles-dir PATH`, `--dry-run` (sync previews copies; clean opens the picker but deletes nothing, and prints a static list when redirected), `--all` (clean; scan every managed directory instead of just skills), `--version`, `-h`/`--help`.
 
@@ -400,10 +404,10 @@ macOS/Linux only - Windows uses `dot.ps1 sync` (copy) instead, since GNU Stow's 
 
 The `dot` CLI already wraps the recommended stow behavior:
 
-- `dot init` performs a non-destructive first-time stow
+- `dot init` performs a first-time stow
 - `dot stow` performs repeatable restows
 
-If you want to run GNU Stow manually, use these patterns.
+If you want to run GNU Stow manually, use these patterns. The CLI also removes existing copied shared Claude skills before stowing.
 
 First-time stow:
 ```bash
