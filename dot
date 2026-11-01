@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Defaults (can be overridden by flags)
 DOTFILES_DIR="$SCRIPT_DIR"
-SKILL_DIRS=(".claude/skills" ".agents/skills")
+SKILL_DIRS=(".agents/skills" ".claude/skills")
 
 print_header() {
     printf "\n${BOLD}${BLUE}==>${RESET} ${BOLD}%s${RESET}\n" "$1"
@@ -61,6 +61,20 @@ install_tools() {
     fi
 }
 
+prepare_claude_skills() {
+    local source path
+    path="$HOME/.claude/skills"
+    if [[ -L "$path" ]]; then
+        rm "$path"
+    fi
+    for source in "$DOTFILES_DIR"/home/.claude/skills/*; do
+        [[ -L "$source" ]] || continue
+        path="$HOME/.claude/skills/${source##*/}"
+        [[ -e "$path" && ! -L "$path" ]] || continue
+        rm -rf -- "$path"
+    done
+}
+
 stow_dotfiles() {
     local mode="${1:-routine}"
     local home_dir="${DOTFILES_DIR}/home"
@@ -78,9 +92,10 @@ stow_dotfiles() {
     fi
 
     print_header "Stowing configuration files"
+    prepare_claude_skills
 
-    # Stow only manages paths present under home/. Init performs a non-destructive
-    # initial stow and fails on conflicts with existing real files. Routine runs
+    # After replacing copied shared skills, Stow manages paths under home/.
+    # Initial stow fails on remaining conflicts with real files. Routine runs
     # use `--restow` to refresh symlinks already managed by stow. Unrelated files
     # in ~/.config are left alone.
 
@@ -198,6 +213,9 @@ cmd_stow() {
 # Include dangling stow links, which -e alone would miss.
 is_orphaned_path() {
     local source="${DOTFILES_DIR}/home/$1"
+    if [[ "$1" == .claude/skills && -L "$source/${2%%/*}" && -d "$DOTFILES_DIR/home/.agents/skills/${2%%/*}" ]]; then
+        return 1
+    fi
     [[ -d "$source" && ( -e "${HOME}/$1/$2" || -L "${HOME}/$1/$2" ) && ! -e "${source}/$2" ]]
 }
 
@@ -214,6 +232,10 @@ walk_orphans() {
         fi
 
         relative="${item#"$target_root"/}"
+
+        if [[ "$rel" == .claude/skills && -L "$source_root/${relative%%/*}" && -d "$DOTFILES_DIR/home/.agents/skills/${relative%%/*}" ]]; then
+            continue
+        fi
 
         # Dot-prefixed entries such as .trash are tool bookkeeping, not skills.
         if [[ "$relative" == .* ]]; then

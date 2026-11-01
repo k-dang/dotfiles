@@ -8,7 +8,7 @@ $VERSION = "0.1.0"
 
 $DOTFILES_DIR = $PSScriptRoot
 $SYNC_PAIRS = @()
-$SKILL_DIRS = @(".claude/skills", ".agents/skills")
+$SKILL_DIRS = @(".agents/skills", ".claude/skills")
 
 function Write-Header {
     param([Parameter(Mandatory)][string]$Message)
@@ -67,6 +67,87 @@ function Ensure-Directory {
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
 }
 
+function Test-ClaudeSkillVariant {
+    param([Parameter(Mandatory)][string]$Name)
+
+    $item = Get-Item -LiteralPath (Join-Path $DOTFILES_DIR "home/.claude/skills/$Name") -Force -ErrorAction SilentlyContinue
+    return $item -and $item.PSIsContainer -and -not $item.LinkType
+}
+
+function Initialize-ClaudeSkillDirectories {
+    param([switch]$DryRun)
+
+    $root = Join-Path $HOME ".claude/skills"
+    $paths = @($root)
+    $overrides = Join-Path $DOTFILES_DIR "home/.claude/skills"
+    if (Test-Path -LiteralPath $overrides -PathType Container) {
+        $paths += @(Get-ChildItem -LiteralPath $overrides -Directory |
+            Where-Object { -not $_.LinkType } | ForEach-Object { Join-Path $root $_.Name })
+    }
+    foreach ($path in $paths) {
+        $item = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        if (-not $item -or -not $item.LinkType) { continue }
+        if ($DryRun) {
+            Write-Info "Would remove link before installing Claude-specific skills: $path"
+        } else {
+            Remove-Item -LiteralPath $path -Force
+        }
+    }
+}
+
+function Set-ClaudeSkillLink {
+    param([Parameter(Mandatory)][string]$Name, [switch]$DryRun)
+
+    $source = Join-Path $HOME ".agents/skills/$Name"
+    $skillsRoot = [IO.Path]::GetFullPath((Join-Path $HOME ".claude/skills"))
+    $link = [IO.Path]::GetFullPath((Join-Path $skillsRoot $Name))
+    if ([IO.Path]::GetDirectoryName($link) -ne $skillsRoot) {
+        throw "Skill link must be directly under ${skillsRoot}: $link"
+    }
+    $item = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+    if ($item -and $item.LinkType -in @("Junction", "SymbolicLink")) {
+        $destination = if ([IO.Path]::IsPathRooted($item.Target)) {
+            [IO.Path]::GetFullPath($item.Target)
+        } else {
+            [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $link) $item.Target))
+        }
+        if ($destination -eq [IO.Path]::GetFullPath($source)) {
+            return
+        }
+    }
+
+    if ($DryRun) {
+        if ($item) { Write-Info "Would replace existing Claude skill: $link" }
+        Write-Info "Would link $link to $source"
+        return
+    }
+    if (-not (Test-Path -LiteralPath $source -PathType Container)) {
+        throw "Shared skills directory not found: $source"
+    }
+    Ensure-Directory -Path (Split-Path -Parent $link)
+    if ($item) {
+        if ($item.PSIsContainer -and -not $item.LinkType) {
+            Remove-Item -LiteralPath $link -Recurse -Force
+        } else {
+            Remove-Item -LiteralPath $link -Force
+        }
+    }
+    $kind = if ($env:OS -eq "Windows_NT") { "Junction" } else { "SymbolicLink" }
+    New-Item -ItemType $kind -Path $link -Target $source | Out-Null
+    Write-Success "Linked Claude skills to $source"
+}
+
+function Set-ClaudeSkillsLinks {
+    param([switch]$DryRun)
+
+    foreach ($skill in Get-ChildItem -LiteralPath (Join-Path $DOTFILES_DIR "home/.claude/skills")) {
+        if (Test-ClaudeSkillVariant -Name $skill.Name) {
+            continue
+        }
+        Set-ClaudeSkillLink -Name $skill.Name -DryRun:$DryRun
+    }
+}
+
 function Test-ManagedPaths {
     if ([string]::IsNullOrWhiteSpace($HOME)) {
         Write-ErrorMsg "HOME is not set"
@@ -107,6 +188,17 @@ function Get-OrphanItems {
         foreach ($item in Get-ChildItem -LiteralPath $directory -Force | Sort-Object -Property FullName) {
             $relativePath = $item.FullName.Substring($TargetRoot.Length).TrimStart([char[]]@('\', '/'))
             $sourcePath = Join-Path $SourceRoot $relativePath
+
+            # Shared Claude skills are installed links; variants have their own source.
+            $claudeSkills = Join-Path $DOTFILES_DIR "home/.claude/skills"
+            if ($sourcePath.StartsWith($claudeSkills + [IO.Path]::DirectorySeparatorChar)) {
+                $skillName = ($sourcePath.Substring($claudeSkills.Length + 1) -split '[\\/]')[0]
+                if ((Test-Path -LiteralPath (Join-Path $claudeSkills $skillName)) -and
+                    -not (Test-ClaudeSkillVariant -Name $skillName) -and
+                    (Test-Path -LiteralPath (Join-Path $DOTFILES_DIR "home/.agents/skills/$skillName") -PathType Container)) {
+                    continue
+                }
+            }
 
             # Report the topmost orphan only. Everything under an orphaned directory is
             # orphaned too, so descending adds no information and buries the report
@@ -156,6 +248,17 @@ function Invoke-SyncPath {
     }
 
     foreach ($item in $items) {
+        if ($SyncPair.Label -eq ".claude" -and $item.Name -eq "skills") {
+            Invoke-SyncPath -SyncPair ([pscustomobject]@{
+                Label = ".claude/skills"
+                Source = $item.FullName
+                Target = Join-Path $SyncPair.Target "skills"
+            }) -DryRun:$DryRun
+            continue
+        }
+        if ($SyncPair.Label -eq ".claude/skills" -and (-not $item.PSIsContainer -or $item.LinkType)) {
+            continue
+        }
         if ($DryRun) {
             Write-Info "Would copy $($item.Name) to $($SyncPair.Target)"
         }
@@ -174,9 +277,11 @@ function Invoke-Sync {
         return 1
     }
 
+    Initialize-ClaudeSkillDirectories -DryRun:$DryRun
     foreach ($syncPair in $SYNC_PAIRS) {
         Invoke-SyncPath -SyncPair $syncPair -DryRun:$DryRun
     }
+    Set-ClaudeSkillsLinks -DryRun:$DryRun
 
     if ($DryRun) {
         Write-Success "Dry run complete for managed home directories"
@@ -184,7 +289,7 @@ function Invoke-Sync {
     }
     else {
         Write-Success "Synced managed home directories"
-        Write-Info "Non-destructive sync: existing extra files were not deleted"
+        Write-Info "Existing shared skill copies were replaced with links; other extra files were retained"
     }
 
     return 0
