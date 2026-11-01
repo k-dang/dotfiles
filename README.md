@@ -100,7 +100,7 @@ dot help                 # Show help
 
 `dot stow` is the safe repeat command. It uses `stow --restow` so rerunning it reconciles managed symlinks already managed by stow.
 
-Shared skills live in `home/.agents/skills/`. The repository contains relative symlinks at `home/.claude/skills/<name>` pointing to `../../.agents/skills/<name>`, so they can be browsed before installation. GNU Stow installs these links normally. The real directories `home/.claude/skills/arena` and `interrogate` contain intentional Claude-specific versions. `dot init` and `dot stow` delete existing copied shared-skill directories before replacing them with links. Repeated runs keep valid shared links. Unmanaged local skills stay in place.
+Shared skills live in `home/.agents/skills/`. The repository contains relative symlinks at `home/.claude/skills/<name>` pointing to `../../.agents/skills/<name>`, so they can be browsed before installation. GNU Stow installs these links normally. `dot init` and `dot stow` delete existing copied shared-skill directories before replacing them with links. Repeated runs keep valid shared links. Unmanaged local skills stay in place.
 
 After replacing copied shared skills, remaining conflicts between existing real files and managed paths under `home/` are left for manual resolution.
 
@@ -183,20 +183,6 @@ $HOME\dotfiles\dot.ps1 sync
 You can run `~/dotfiles/dot help` or `$HOME\dotfiles\dot.ps1 help` at any time to see the current command list.
 
 ## Verification
-
-### Cleanup regression tests
-
-From the repo root, run the suite for the CLI you are changing:
-
-```bash
-bash tests/dot-clean.sh
-```
-
-```powershell
-pwsh -NoProfile -File tests/dot-clean.ps1
-```
-
-Both suites use temporary home directories and mocked picker selections; they never clean your real home directory. Link checks are skipped if the platform cannot create links.
 
 ### macOS
 

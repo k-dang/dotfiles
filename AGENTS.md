@@ -23,7 +23,7 @@ Shell config entry points (`shell/zsh.sh` and `shell/powershell.ps1`) source mod
 
 - Machine-specific settings go in `modules/local.sh` or `modules/local.ps1` (gitignored). Copy from `modules/local.example.{sh,ps1}` as a starting point.
 - Stow layout: `home/` mirrors `~`, stow creates symlinks
-- Shared skills live in `home/.agents/skills/`, including their `agents/openai.yaml` metadata, with relative symlinks under `home/.claude/skills/`. Windows sync installs shared skills as junctions, including when Git checks out symlinks as plain files. `home/.claude/skills/arena` and `interrogate` are intentional Claude-specific variants; keep them separate from their `.agents` versions.
+- Shared skills live in `home/.agents/skills/`, including their `agents/openai.yaml` metadata, with relative symlinks under `home/.claude/skills/`. Windows sync installs shared skills as junctions, including when Git checks out symlinks as plain files.
 
 ## Anti-patterns
 
