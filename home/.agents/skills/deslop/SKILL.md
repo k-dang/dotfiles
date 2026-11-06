@@ -1,7 +1,6 @@
 ---
 name: deslop
 description: Remove AI-generated code slop introduced in the current branch.
-disable-model-invocation: true
 ---
 
 # Deslop
