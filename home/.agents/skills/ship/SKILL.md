@@ -19,7 +19,7 @@ This request grants permission to commit and push this branch, use `--force-with
 5. **Review.** Run `git diff --shortstat` against the base. At 300 or more changed lines, run the `thermo-nuclear-code-quality-review` agent with the diff and changed files, or follow that skill's `SKILL.md` directly in a harness without the agent. Fix findings inside the fence and re-prove any behavior they change. Done when the diff is under 300 lines, or every finding is fixed or declined with a reason.
 6. **File.** Commit, rebase onto the latest base, and push. Recheck behavior after any meaningful conflict fix. Run `file-pr`, adding one line that says how the change was proved.
 7. **Babysit.** Run `babysit-pr` on the PR until its merge gate reports `MERGE_READY`, `AWAITING_REVIEW`, `BLOCKED`, or `WATCH_COMPLETE` on the current remote head. These overrides take precedence:
-   - Use a 2-hour watch.
+   - Use a 30-minute watch.
    - Use this skill's scope fence.
 8. **Close out.** With merge granted and `MERGE_READY`, merge with the method the repo uses and wait until GitHub reports the PR as merged. Otherwise leave the PR open and unmerged. Stop the PR watch, then report the PR link, final state, proof, review outcome, and each decision you made for the user.
 
