@@ -18,11 +18,8 @@ This request grants permission to commit and push this branch, use `--force-with
 4. **Prove.** Use the repo's `verify-*` skill when it has one, and run the checks its CI runs. For UI or runtime behavior, run the app and look at the change, since green mocked tests do not prove it. Collect the evidence `file-pr` requires. Done when you have observed evidence yourself in this session for every behavior change in the diff.
 5. **Review.** Run `git diff --shortstat` against the base. At 300 or more changed lines, run the `thermo-nuclear-code-quality-review` agent with the diff and changed files, or follow that skill's `SKILL.md` directly in a harness without the agent. Fix findings inside the fence and re-prove any behavior they change. Done when the diff is under 300 lines, or every finding is fixed or declined with a reason.
 6. **File.** Commit, rebase onto the latest base, and push. Recheck behavior after any meaningful conflict fix. Run `file-pr`, adding one line that says how the change was proved.
-7. **Babysit.** Run `babysit-pr` on the PR until its merge gate reports `MERGE_READY`, `AWAITING_REVIEW`, `BLOCKED`, or `WATCH_COMPLETE` on the current remote head. These overrides take precedence:
-   - Use a 30-minute watch.
-   - Use this skill's scope fence.
-   - Prove each fix before pushing it.
-8. **Close out.** With merge granted and `MERGE_READY`, merge with the method the repo uses and wait until GitHub reports the PR as merged. Otherwise leave the PR open and unmerged. Stop the PR watch, then report the PR link, final state, proof, review outcome, and each decision you made for the user.
+7. **Babysit.** Run `babysit-pr` on the PR, with this skill's scope fence as the boundary for feedback. Prove each fix before pushing it. Done when `pr-wait` exits 0 on the current remote head, or it exits 1 for something you cannot resolve.
+8. **Close out.** With merge granted and `pr-wait` at exit 0, follow `babysit-pr`'s merge rules, merge with the method the repo uses, and wait until GitHub reports the PR as merged. Otherwise leave the PR open and unmerged. Report the PR link, final state, proof, review outcome, and each decision you made for the user.
 
 ## Asking the user
 
@@ -31,6 +28,6 @@ Ask only when you cannot continue alone, using your harness's question tool, suc
 - You cannot prove a change.
 - The goal is ambiguous in a way that changes the result.
 - The next step touches production, deletes data, reaches outside the repo, or force-pushes another branch.
-- The merge gate cannot pass, and you cannot fix that yourself.
+- `pr-wait` exits 1, and you cannot fix the cause yourself.
 
 Merge through branch protection as configured. Merging bypasses such as `--admin` always need the user.
