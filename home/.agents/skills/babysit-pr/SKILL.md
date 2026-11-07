@@ -15,8 +15,6 @@ Every watcher on a GitHub account shares one rate limit.
 
 Never write your own watcher, polling loop, or `sleep` loop.
 
-### Everywhere else: `pr-wait`
-
 Wait with `scripts/pr-wait` from this skill's directory (use its absolute path).
 
 ```bash
@@ -42,7 +40,7 @@ It remembers what it already reported, so nothing that arrived in between is
 lost. If it says another pid already watches the PR, do not start a second one.
 Kill the old one only if its events do not reach you.
 
-With either watcher: when an event needs no action, end your turn without a
+When an event needs no action, end your turn without a
 message. Never post or say "still waiting".
 
 ## GitHub rate limits
