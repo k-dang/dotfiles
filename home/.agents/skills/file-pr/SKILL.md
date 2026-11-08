@@ -40,6 +40,14 @@ For screenshots or recordings, load the `before-and-after` skill and follow its 
 
 If capture or verification is blocked, document the attempted step, concrete blocker, and missing evidence in the PR description.
 
+Evidence in the description is for the reviewer, not a log of what you ran. Show only the results that demonstrate the changed behavior and that the reviewer can't get from CI or the diff. Do not list passing suites, lint, or individual test cases. Mention unverified paths only when a reviewer would assume they were covered.
+
+BAD
+> ❌ Targeted specs pass (212 examples). Parser: rejects `abc`, `-1`, `1e9`… Full suite passes (1,840 examples). Rubocop clean.
+
+GOOD
+> ✅ End to end: a 10% coupon applied at checkout turns a $50 order into $45 on the emailed receipt.
+
 ## Change outline
 
 Load the `show-me` skill for every PR and default to a compact visual showing the change. Use `references/show-me.md` for PR formatting. Evidence captures can serve as the outline when they explain the change.
