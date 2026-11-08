@@ -7,6 +7,8 @@ description: File a concise pull request. Use when the user asks to file, open o
 
 Before filing, check whether a PR for this branch already exists. Resolve the actual base — the existing PR's base if present, otherwise the parent branch for stacks or the repo default. Do not assume `origin/main`. Review the diff locally against that base to make sure its contents match the goal.
 
+Before filing or pushing, run the repository's fast CI checks locally (lint, format, typecheck; find them in `.github/workflows` and the package scripts) and fix any failures. Do this even for docs-only changes, since formatters check those files too. Leave these results out of the description.
+
 PR titles usually become commit messages, so follow the repository's title conventions. Look at recently merged PRs and Git history for examples. Prefer a concise, human-readable title that explains why the change matters:
 
 BAD
