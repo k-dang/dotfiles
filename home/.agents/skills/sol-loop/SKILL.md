@@ -5,8 +5,8 @@ description: Use when the user says "sol loop".
 
 # Sol loop
 
-Have GPT 6.1 Sol (via Pi) review your change in a loop. Make the smallest
-changes that satisfy Sol. Watch for scope creep and push back when warranted.
+Have GPT Sol review your change in a loop. Make the smallest changes that
+satisfy Sol. Watch for scope creep and push back when warranted.
 
 ## Budget
 
@@ -41,16 +41,39 @@ missing or pre-failing checks in the brief.
 
 ## 2. Run Sol
 
+Pick one route and keep it for every round. Use the route the user names.
+Otherwise use T3 if its tools are listed or one direct
+`orchestrator_capabilities` call succeeds; else use Pi. If no route runs Sol,
+report the blocker. Use no substitute model.
+
+Each round, send the brief below with fields filled in. Round 2+ also gets the
+ledger (`fixed:` / `disagree:` / `declined:` + evidence), the same base diff,
+and the change since last round. Tell Sol: open ids and changed code only.
+Mark each old id `resolved` or `still open: <reason>`.
+
+Do not edit scoped files while review runs. An error, timeout, or a report
+without `VERDICT:` is a failed round, not approval. On failure, confirm the
+reviewer has stopped, then restart the round with the ledger.
+
+### T3
+
+Once: call `orchestrator_capabilities`. Pick the latest Sol unless the user
+named a version. Do not hardcode an ID. Record provider, model, and effort
+only if exposed.
+
+Each round: a fresh `delegate_task` (`role: "review"`, `mode: "async"`, new
+`clientRequestId`) with the brief. Children get no history, so every brief is
+complete. Save `taskId`. Wait for the notice; do not poll. `childThreadId` is
+storage, not the next target. Do not use `t3_thread_send`, `create_threads`, or
+`t3_thread_launch` for review. On failure, `task_cancel` before restarting.
+
+### Pi
+
 Once: confirm the model with
 `pi --no-extensions --no-mcp --offline --list-models bedrock-mantle-gpt-6-1-sol`.
-If the model or auth is missing, report the blocker; use no substitute model.
 Create `run=$(mktemp -d "${TMPDIR:-/tmp}/sol-loop.XXXXXX")`.
 
-Each round, write `$run/round-$N.md`: the brief below with fields filled in.
-Round 2+ also gets the ledger (`fixed:` / `disagree:` / `declined:` + evidence),
-the same base diff, and the change since last round. Tell Sol: open ids and
-changed code only. Mark each old id `resolved` or `still open: <reason>`.
-Then run from the repo:
+Each round, write the brief to `$run/round-$N.md`, then run from the repo:
 
 ```sh
 pi --provider litellm --model bedrock-mantle-gpt-6-1-sol --thinking high \
@@ -59,11 +82,9 @@ pi --provider litellm --model bedrock-mantle-gpt-6-1-sol --thinking high \
   "@$run/round-$N.md" > "$run/round-$N.txt" 2> "$run/round-$N.stderr"
 ```
 
-Do not edit scoped files while review runs. A nonzero exit, timeout, or a
-report without `VERDICT:` is a failed round, not approval. On failure, confirm
-`pi` has exited, then restart the round with the ledger.
+A nonzero exit is a failed round. On failure, confirm `pi` has exited.
 
-Brief:
+### Brief
 
 ```
 Review only. Do not edit, commit, push, comment on PRs, or start subagents.
@@ -103,6 +124,6 @@ behavior code changed, or approval does not cover the current behavior diff.
 - **Stuck:** an item stays disputed after two replies, or budget ends. Show
   both sides in 2-3 lines each. The user decides. Budget end is not approval.
 
-Report: rounds, model and thinking level, checks, fixed and declined findings
-with reasons, diff size before/after, and `$run`. Leave the result uncommitted;
+Report: route, rounds, model and effort (if exposed), checks, fixed and declined
+findings with reasons, diff size before/after, and `$run` (Pi) or task ids (T3). Leave the result uncommitted;
 commits, pushes, and PR comments are the user's call.
