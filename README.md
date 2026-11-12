@@ -194,7 +194,7 @@ source ~/.zshrc
 ~/dotfiles/dot doctor
 
 # Test an alias
-ga some-branch
+ll
 ```
 
 ### Windows
@@ -207,7 +207,7 @@ ga some-branch
 $HOME\dotfiles\dot.ps1 doctor
 
 # Test an alias
-ga some-branch
+ll
 ```
 
 ## Adding New Aliases
@@ -345,8 +345,6 @@ Each installer function is idempotent - it skips a tool that's already installed
 - `ccy` - `claude --dangerously-skip-permissions`
 - `cca` - `claude --enable-auto-mode`
 - `ls`, `ll`, `la`, `lt` - `eza` in place of `ls` (list, long, all, tree), if `eza` is installed
-- `ga <branch>` - Create new worktree + branch, `mise trust` it, and step into it
-- `gd` - Remove current worktree and its branch (prompts via `gum confirm`)
 
 ### Windows
 
@@ -354,8 +352,6 @@ Each installer function is idempotent - it skips a tool that's already installed
 - `ccy` - `claude --dangerously-skip-permissions`
 - `cca` - `claude --enable-auto-mode`
 - `ll`, `lt` - `eza` in place of `ls` (long, tree), if `eza` is installed
-- `ga <branch>` - Create new worktree + branch and step into it
-- `gd` - Remove current worktree and its branch (prompts via `gum confirm`, falls back to a plain y/n prompt if `gum` isn't installed)
 
 ## Uninstall
 
