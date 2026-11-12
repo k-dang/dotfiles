@@ -1,12 +1,30 @@
 {
   "version": 2,
   "skills": {
+    "adversarial-review": {
+      "source": "k-dang/skills",
+      "sourceType": "github",
+      "skillPath": "skills/eng/adversarial-review/SKILL.md",
+      "computedHash": "4f7e3d2a9fa8d73cf1d198f4ad62dd5d3f78d6d0c33246fcd9782bb70caaf2c9"
+    },
     "before-and-after": {
       "source": "vercel-labs/before-and-after",
       "ref": "main",
       "sourceType": "github",
       "skillPath": "skill/SKILL.md",
       "computedHash": "d4531ea71e270b5de72631ab1e6a6da372d404c58ad32889c9776ccb66c392d3"
+    },
+    "idiomatic-code": {
+      "source": "k-dang/skills",
+      "sourceType": "github",
+      "skillPath": "skills/eng/idiomatic-code/SKILL.md",
+      "computedHash": "0a077361ff746f1e1e6dd10a3997fa80eb4d40f23da5c0e13f7f6d306ea764d5"
+    },
+    "no-comments": {
+      "source": "k-dang/skills",
+      "sourceType": "github",
+      "skillPath": "skills/eng/no-comments/SKILL.md",
+      "computedHash": "a9aff309b2cce1444d7910b30d770703ffc2a5e062e534c169374950709455fc"
     }
   }
 }
