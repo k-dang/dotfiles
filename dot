@@ -61,20 +61,6 @@ install_tools() {
     fi
 }
 
-prepare_claude_skills() {
-    local source path
-    path="$HOME/.claude/skills"
-    if [[ -L "$path" ]]; then
-        rm "$path"
-    fi
-    for source in "$DOTFILES_DIR"/home/.claude/skills/*; do
-        [[ -L "$source" ]] || continue
-        path="$HOME/.claude/skills/${source##*/}"
-        [[ -e "$path" && ! -L "$path" ]] || continue
-        rm -rf -- "$path"
-    done
-}
-
 stow_dotfiles() {
     local mode="${1:-routine}"
     local home_dir="${DOTFILES_DIR}/home"
@@ -92,12 +78,10 @@ stow_dotfiles() {
     fi
 
     print_header "Stowing configuration files"
-    prepare_claude_skills
 
-    # After replacing copied shared skills, Stow manages paths under home/.
-    # Initial stow fails on remaining conflicts with real files. Routine runs
-    # use `--restow` to refresh symlinks already managed by stow. Unrelated files
-    # in ~/.config are left alone.
+    # Stow manages paths under home/. Initial stow fails on conflicts with real
+    # files. Routine runs use `--restow` to refresh symlinks already managed by
+    # stow. Unrelated files in ~/.config are left alone.
 
     local stow_args=(--target="$HOME" --no-folding -d "$DOTFILES_DIR")
 
