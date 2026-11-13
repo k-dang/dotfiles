@@ -76,13 +76,16 @@ Create `run=$(mktemp -d "${TMPDIR:-/tmp}/sol-loop.XXXXXX")`.
 Each round, write the brief to `$run/round-$N.md`, then run from the repo:
 
 ```sh
-pi --provider litellm --model bedrock-mantle-gpt-6-1-sol --thinking high \
+timeout 900 pi --provider litellm --model bedrock-mantle-gpt-6-1-sol --thinking high \
   --print --offline --no-extensions --no-mcp --no-skills --no-prompt-templates \
   --session-dir "$run/round-$N-session" \
-  "@$run/round-$N.md" > "$run/round-$N.txt" 2> "$run/round-$N.stderr"
+  "@$run/round-$N.md" < /dev/null > "$run/round-$N.txt" 2> "$run/round-$N.stderr"
 ```
 
-A nonzero exit is a failed round. On failure, confirm `pi` has exited.
+Keep `< /dev/null`. `pi --print` reads stdin when it isn't a terminal, and an agent's shell
+can hand it one that never closes: `pi` then waits forever with no output. `timeout`
+turns any other hang into a failed round. A nonzero exit (124 is the timeout) is a
+failed round. On failure, confirm `pi` has exited.
 
 ### Brief
 
