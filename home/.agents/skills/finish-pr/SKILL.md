@@ -1,18 +1,18 @@
 ---
 name: finish-pr
-description: Finish implemented work on this branch with cleanup, review, and a filed PR, with the user choosing which review findings to fix.
+description: Finish implemented work on this branch with cleanup, review, proof, and a filed PR, with the user choosing which review findings to fix.
 disable-model-invocation: true
 ---
 
 # Finish PR
 
-Take implemented work on this branch through cleanup and review to a filed PR. The user is present: they choose which review findings get fixed.
+Take implemented work on this branch through cleanup, review, and proof to a filed PR. The user is present: they choose which review findings get fixed.
 
 ## Mode
 
 Pick from `git diff --shortstat` against the base (the existing PR's base, the parent branch for stacks, otherwise the repo default), unless the user names one:
 
-- **Light**: under ~150 changed lines, or a small UI tweak or fix. Run `deslop`, then `file-pr`.
+- **Light**: under ~150 changed lines, or a small UI tweak or fix. Run `deslop`, the Prove step, then `file-pr`.
 - **Full**: everything else. Run every step below.
 
 State the mode and line count in one line before starting.
@@ -24,4 +24,5 @@ State the mode and line count in one line before starting.
 3. **Fix.** Apply exactly the findings the user picked. When the user asks which approach is simpler, compare the options and recommend one before changing code.
 4. **Sol review.** Run `sol-loop` on the diff.
 5. **Deslop.** Run `deslop`. Remove comments that restate the code; keep only those explaining a non-obvious why. Done when the diff carries no slop.
-6. **File.** Run `file-pr`.
+6. **Prove.** Use the repo's `verify-*` skill when it has one, and run the checks its CI runs. For UI or runtime behavior, run the app and look at the change, since green mocked tests do not prove it. Show the user what you observed for each behavior change, and ask about any you could not prove. Done when you have observed evidence yourself in this session for every behavior change in the diff.
+7. **File.** Run `file-pr`.
