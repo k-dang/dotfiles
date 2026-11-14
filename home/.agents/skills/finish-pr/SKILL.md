@@ -8,14 +8,7 @@ disable-model-invocation: true
 
 Take implemented work on this branch through cleanup, review, and proof to a filed PR. The user is present: they choose which review findings get fixed.
 
-## Mode
-
-Pick from `git diff --shortstat` against the base (the existing PR's base, the parent branch for stacks, otherwise the repo default), unless the user names one:
-
-- **Light**: under ~150 changed lines, or a small UI tweak or fix. Run `deslop`, the Prove step, then `file-pr`.
-- **Full**: everything else. Run every step below.
-
-State the mode and line count in one line before starting.
+The base is the existing PR's base, the parent branch for stacks, otherwise the repo default. Run every step for every change.
 
 ## Steps
 
