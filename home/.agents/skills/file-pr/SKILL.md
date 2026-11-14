@@ -7,7 +7,7 @@ description: File a concise pull request. Use when the user asks to file, open o
 
 Before filing, check whether a PR for this branch already exists. Resolve the actual base — the existing PR's base if present, otherwise the parent branch for stacks or the repo default. Do not assume `origin/main`. Review the diff locally against that base to make sure its contents match the goal.
 
-Before filing or pushing, run the repository's fast CI checks locally (lint, format, typecheck; find them in `.github/workflows` and the package scripts) and fix any failures. Do this even for docs-only changes, since formatters check those files too. Leave these results out of the description.
+Before filing or pushing, run the repository's fast CI checks locally (lint, format, typecheck; find them in `.github/workflows` and the package scripts) and fix any failures. Do this even for docs-only changes, since formatters check those files too.
 
 PR titles usually become commit messages, so follow the repository's title conventions. Look at recently merged PRs and Git history for examples. Prefer a concise, human-readable title that explains why the change matters:
 
@@ -27,6 +27,8 @@ BAD
 GOOD
 > ✅ My "new worktree" default was ignored when starting new threads on existing worktrees. Super unintuitive. Now your preferences always apply.
 
+Throughout the description, write as one human talking to another: simple, coherent, concise language, no jargon or slang.
+
 ## Context gathering
 
 Gather only what is needed to explain the change: the ticket/task artifacts, the complete diff against the base plus enough surrounding code to understand behavior and ownership, and `gh pr view` metadata / changed files when a PR already exists.
@@ -38,7 +40,7 @@ Before filing or updating, obtain evidence for the changed behavior:
 - Visible UI changes require before/after screenshots of the base and changed versions at the same viewport and corresponding state. For new UI, capture an after-only preview. Use a recording when motion or interaction is needed to show the change.
 - Functional changes require focused test or command results. For bug fixes, reproduce the failure on the base and show the corrected behavior on the changed version.
 
-For screenshots or recordings, load the `before-and-after` skill and follow its capture and PR attachment workflow. Embed the published media in the PR description. Diagrams explain logic or structure; captures show the actual UI behavior.
+For screenshots or recordings, load the `before-and-after` skill and follow its capture and PR attachment workflow. Embed the published media in the PR description.
 
 If capture or verification is blocked, document the attempted step, concrete blocker, and missing evidence in the PR description.
 
@@ -52,7 +54,7 @@ GOOD
 
 ## Change outline
 
-Load the `show-me` skill for every PR and default to a compact visual showing the change. Use `references/show-me.md` for PR formatting. Evidence captures can serve as the outline when they explain the change.
+Captures show the actual UI behavior; the outline explains logic or structure. Default to a compact visual of the change, picked from the formats in `references/show-me.md`. Visuals sit beside the text and support it. They never replace the opener or the explanation. Evidence captures can serve as the outline when they explain the change.
 
 Omit the explanatory outline only for straightforward local or mechanical edits fully explained by the opener, or an explicitly minimal template. Evidence requirements still apply.
 
@@ -72,11 +74,9 @@ Include only views that help explain this PR, ordered to tell the story. Omit ca
 
 Prefer `diff` blocks when showing changes to an existing shape. Show the complete target shape when most of it is new or diff notation would obscure ownership or order.
 
-Write as one human talking to another: simple, coherent, concise language, no jargon or slang.
-
 ## Merge risk
 
-For changes with irreversible effects, impact beyond the changed component, or rollout/recovery requirements, briefly name who or what is affected and whether reverting the code fully restores the previous behavior. Note irreversible effects and any required rollout or recovery steps.
+For changes with irreversible effects, impact beyond the changed component, or rollout/recovery requirements, briefly name who or what is affected and whether reverting the code fully restores the previous behavior. Note irreversible effects and any required rollout or recovery steps. Put this in a short section at the end of the description, or in the template's equivalent section.
 
 ## Report completion
 
