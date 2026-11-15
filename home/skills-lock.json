@@ -14,6 +14,12 @@
       "skillPath": "skill/SKILL.md",
       "computedHash": "d4531ea71e270b5de72631ab1e6a6da372d404c58ad32889c9776ccb66c392d3"
     },
+    "explainer": {
+      "source": "overment/skills",
+      "sourceType": "github",
+      "skillPath": "skills/explainer/SKILL.md",
+      "computedHash": "cb00c0eb3e8ce58a695d03782b89aff5314a1c9182412fe42a05ead95caffe4e"
+    },
     "idiomatic-code": {
       "source": "k-dang/skills",
       "sourceType": "github",
