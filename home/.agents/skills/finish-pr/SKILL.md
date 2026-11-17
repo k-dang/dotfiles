@@ -1,6 +1,6 @@
 ---
 name: finish-pr
-description: Finish implemented work on this branch with cleanup, review, proof, and a filed PR. Use when the user mentions finish-pr or asks to finish the PR.
+description: Trigger this when the user says 'finish pr' or asks to finish the PR.
 ---
 
 # Finish PR
