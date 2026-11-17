@@ -1,7 +1,6 @@
 ---
 name: finish-pr
-description: Finish implemented work on this branch with cleanup, review, proof, and a filed PR, with the user choosing which review findings to fix.
-disable-model-invocation: true
+description: Trigger this when the user says 'finish pr' or asks to finish the PR.
 ---
 
 # Finish PR

@@ -1,7 +1,6 @@
 ---
 name: full-ship
-description: Finish, clean up, prove, review, and file work as a PR, stopping before merge.
-disable-model-invocation: true
+description: Trigger this if the user says 'full ship'.
 ---
 
 # Full Ship
