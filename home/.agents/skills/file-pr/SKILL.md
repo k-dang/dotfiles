@@ -39,6 +39,7 @@ Before filing or updating, obtain evidence for the changed behavior:
 
 - Visible UI changes require before/after screenshots of the base and changed versions at the same viewport and corresponding state. For new UI, capture an after-only preview. Use a recording when motion or interaction is needed to show the change.
 - Functional changes require focused test or command results. For bug fixes, reproduce the failure on the base and show the corrected behavior on the changed version.
+- Captures from running the real app count even when the change looks the same, such as a refactor or perf change. Embed them as after-only previews when they show a user path the change touches still working. Label each one with the path it proves.
 
 For screenshots or recordings, load the `before-and-after` skill and follow its capture and PR attachment workflow. Embed the published media in the PR description.
 
@@ -82,5 +83,11 @@ For changes with irreversible effects, impact beyond the changed component, or r
 
 Before reporting completion, inspect the rendered PR description. Every required capture, verification result, and outline must be present, with media loading correctly, or have a concrete blocker documented in the description.
 
-After filing or updating, respond with the PR URL and a brief summary of the outcome. Mention verification results, caveats, or decisions that affect the user's next step. Include changed-file details only when they help the user locate something they need to inspect or act on.
+After filing or updating, reply with:
+
+1. The PR URL.
+2. The PR's opener and change outline, as written in the description.
+3. Only what the user must act on: unproven behavior and open caveats.
+
+Do not recap the steps you ran, reviews, or passing checks, and do not justify process choices.
 
