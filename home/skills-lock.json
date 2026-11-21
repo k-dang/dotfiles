@@ -24,7 +24,8 @@
       "source": "k-dang/skills",
       "sourceType": "github",
       "skillPath": "skills/eng/idiomatic-code/SKILL.md",
-      "computedHash": "0a077361ff746f1e1e6dd10a3997fa80eb4d40f23da5c0e13f7f6d306ea764d5"
+      "computedHash": "7bac5d95a67c309459bbc023f9beadab42ef8e8ff4581c64a1891582b4cbff2f",
+      "commit": "58bf830e50e27ee066b1a64184aef5d1ec1d94f7"
     },
     "no-comments": {
       "source": "k-dang/skills",

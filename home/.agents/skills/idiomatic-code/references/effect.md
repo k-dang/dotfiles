@@ -2,11 +2,13 @@
 
 ## Default repositories
 
-Unless the user specifies a different reference set, use all three as the gold standards for Effect audits:
+Unless the user specifies a different reference set, use the following repos as the gold standards for Effect audits:
 
 - OpenCode: `anomalyco/opencode`.
 - T3 Code: `pingdotgg/t3code`.
 - Effect-TS: `Effect-TS/effect`.
+- executor: `UsefulSoftwareCo/executor`.
+- alchemy: `alchemy-run/alchemy`.
 
 Explicit replacement repositories override this set; requests to add repositories extend it. The versioned `effect` package establishes the target's library contract; the full Effect repository supplies broader examples and tests.
 
