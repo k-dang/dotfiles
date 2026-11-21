@@ -83,11 +83,22 @@ For changes with irreversible effects, impact beyond the changed component, or r
 
 Before reporting completion, inspect the rendered PR description. Every required capture, verification result, and outline must be present, with media loading correctly, or have a concrete blocker documented in the description.
 
-After filing or updating, reply with:
+After filing or updating, reply with the PR URL and a catch-up for the user. They took part in this thread but may have stepped away while you worked. The PR description is written for a reviewer who has never seen the work. The catch-up is for someone who has, so measure it against what they last saw and asked for, and skip anything that only repeats it. Do not restate or quote the description; the link is enough.
 
-1. The PR URL.
-2. The PR's opener and change outline, as written in the description.
-3. Only what the user must act on: unproven behavior and open caveats.
+Include only the parts that apply:
+
+- **Differs from the ask**: where the result departs from what the user asked for or picked, and why.
+- **Decided without you**: choices you made on your own that the user might push back on, each with a one-line reason.
+- **Found along the way**: constraints, bugs, or surprises that changed the plan.
+- **Needs you**: unproven behavior, open caveats, and leftovers to clean up (pushed branches, temporary files).
+
+If the work went exactly as agreed, say so in one line and list only what needs the user.
+
+BAD
+> ❌ **Opener, as written in the PR:** The new Inset layout puts the page in a raised card, but the old status bar still ran along the bottom… **Change outline:** AppShell ├─ ClassicFrame…
+
+GOOD
+> ✅ Built option A as picked. **Decided without you:** moved the Classic footer out of the shared page into ClassicFrame so Inset could drop it cleanly. **Found along the way:** resource usage is only sampled while the menu is open, so CPU/RAM shows "—" for a moment on open. **Needs you:** I didn't click the Classic footer's shortcuts button in the running app. Delete `origin/prototype/status-bar-placement` when done comparing.
 
 Do not recap the steps you ran, reviews, or passing checks, and do not justify process choices.
 
