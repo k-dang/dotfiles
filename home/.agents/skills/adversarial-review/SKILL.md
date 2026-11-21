@@ -26,7 +26,7 @@ These are model preferences, not literal tool IDs:
 | Reviewer | Required model | Reasoning preference |
 | --- | --- | --- |
 | A | Claude Opus 5.5 | xhigh, otherwise high |
-| B | OpenAI GPT 6.1 Sol | xhigh, otherwise high |
+| B | OpenAI GPT 6.2 Sol | xhigh, otherwise high |
 
 Use exactly these two reviewers unless the user explicitly changes the roster for this review. A different spelling or provider-qualified ID for the same model is a resolution, not a substitution. A different version or variant is a substitution; preserve the Sol variant.
 

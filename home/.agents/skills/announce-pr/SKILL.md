@@ -1,12 +1,12 @@
 ---
 name: announce-pr
-description: Watch a PR's CI and draft a paste-ready Slack post announcing it.
+description: Watch a PR's CI and draft a paste-ready post
 disable-model-invocation: true
 ---
 
 # Announce PR
 
-Two jobs for one open PR, run side by side: tell the user when CI finishes, and hand them a one-line Slack post that reads like the others in the target channel. The user pastes the post; your output is the text.
+Two jobs for one open PR, run side by side: tell the user when CI finishes, and hand them a one-line Slack post that reads like the others. The user pastes the post; your output is the text.
 
 ## 1. Resolve the PR and channel
 
