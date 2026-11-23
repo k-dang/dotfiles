@@ -1,0 +1,9 @@
+{
+  "model": "anthropic/claude-sonnet-5-5",
+  "extensions": ["installed:herdr-split"],
+  "steps": [
+    { "send": "/split --help" },
+    { "expect": "Usage: /split [--help]" },
+    { "shot": true }
+  ]
+}
