@@ -36,10 +36,10 @@ The user's own earlier posts set the format; fall back to the channel's most com
 
 ## 4. Draft the post
 
-One line in a code block, in that format, under ~25 words. Write it for a teammate skimming the channel, not for the PR's reviewer: the area it touches, what changed, and why it matters to them, the way you'd say it out loud. Don't lift the PR's opener or title; those are written for review and use code-level terms like class names, options or "collaborators". End a refactor with "No behaviour change". Use the bare PR URL, with no `< >` around it or any other text; Slack unfurls it.
+One line in a code block, in that format, usually under ~15 words. Say what the PR does, the way an engineer would: start with a verb and name the thing that changed with everyday engineering words like mutation, column, flag, alert or task. Put a scope limit in parentheses, e.g. "(admin only)". Leave out benefits and selling points such as "all-or-nothing", "logged under their name" or "so ops can…"; the PR has those. Avoid class and method names. End a refactor with "No behaviour change". Use the bare PR URL, with no `< >` around it or any other text; Slack unfurls it.
 
 ```
-[`billing-api`] Invoice export cleanup: report tests can now swap in fakes instead of stubbing globals. No behaviour change https://github.com/acme/billing-api/pull/1234
+[`billing-api`] Expose new mutation to void batch of draft invoices (admin only) https://github.com/acme/billing-api/pull/1234
 ```
 
 ## 5. Report CI
