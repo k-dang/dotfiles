@@ -69,14 +69,24 @@ storage, not the next target. Do not use `t3_thread_send`, `create_threads`, or
 
 ### Pi
 
-Once: confirm the model with
-`pi --no-extensions --no-mcp --offline --list-models bedrock-mantle-gpt-6-1-sol`.
-Create `run=$(mktemp -d "${TMPDIR:-/tmp}/sol-loop.XXXXXX")`.
+Once: pick the latest Sol unless the user named a version. Do not hardcode an
+ID. Keep the result for every round:
+
+```sh
+model=$(pi --no-extensions --no-mcp --offline --list-models sol 2>/dev/null |
+  awk '$1 == "litellm" && $2 ~ /^bedrock-mantle-gpt-[0-9]+(-[0-9]+)*-sol$/ {
+    v = $2; sub(/^bedrock-mantle-gpt-/, "", v); sub(/-sol$/, "", v)
+    gsub(/-/, ".", v); print v, $2 }' |
+  sort -V | tail -1 | cut -d' ' -f2)
+```
+
+An empty `$model` means no route runs Sol. Create
+`run=$(mktemp -d "${TMPDIR:-/tmp}/sol-loop.XXXXXX")`.
 
 Each round, write the brief to `$run/round-$N.md`, then run from the repo:
 
 ```sh
-timeout 900 pi --provider litellm --model bedrock-mantle-gpt-6-1-sol --thinking high \
+timeout 900 pi --provider litellm --model "$model" --thinking high \
   --print --offline --no-extensions --no-mcp --no-skills --no-prompt-templates \
   --session-dir "$run/round-$N-session" \
   "@$run/round-$N.md" < /dev/null > "$run/round-$N.txt" 2> "$run/round-$N.stderr"
